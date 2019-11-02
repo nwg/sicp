@@ -442,11 +442,3 @@
         (error "Unknown operation: ASSEMBLE"
                symbol))))
 
-
-(define test-operation-with-symbol-machine
-  (make-machine
-   '()
-   (list (list 'display display))
-   '(
-     start
-     (perform (op display) (label start)))))
