@@ -419,8 +419,10 @@
              operations))
         (aprocs
          (map (lambda (e)
-                (make-primitive-exp 
-                 e machine labels))
+                (if (label-exp? e)
+                    (error "Operation cannot operate on label expression")
+                    (make-primitive-exp 
+                     e machine labels)))
               (operation-exp-operands exp))))
     (lambda () (apply op (map (lambda (p) (p))
                               aprocs)))))
@@ -439,3 +441,12 @@
         (cadr val)
         (error "Unknown operation: ASSEMBLE"
                symbol))))
+
+
+(define test-operation-with-symbol-machine
+  (make-machine
+   '()
+   (list (list 'display display))
+   '(
+     start
+     (perform (op display) (label start)))))
