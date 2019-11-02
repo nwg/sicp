@@ -161,13 +161,15 @@
        (lambda (insts labels)
          (let ((next-inst (car text)))
            (if (symbol? next-inst)
-               (receive 
-                   insts
-                   (cons 
-                    (make-label-entry 
-                     next-inst
-                     insts)
-                    labels))
+               (if (assoc next-inst labels)
+                   (error "Label already exists --" next-inst)
+                   (receive 
+                    insts
+                    (cons 
+                     (make-label-entry 
+                      next-inst
+                      insts)
+                     labels)))
                (receive 
                    (cons (make-instruction 
                           next-inst)
@@ -437,3 +439,22 @@
         (cadr val)
         (error "Unknown operation: ASSEMBLE"
                symbol))))
+
+
+(define ex5.8-test-machine
+  (make-machine
+   '(a)
+   (list)
+   '(start
+       (goto (label here))
+     here
+       (assign a (const 3))
+       (goto (label there))
+     here
+       (assign a (const 4))
+       (goto (label there))
+     there)))
+
+(start ex5.8-test-machine)
+(display "ex5.8-test-machine: ")
+(display (get-register-contents ex5.8-test-machine 'a))
