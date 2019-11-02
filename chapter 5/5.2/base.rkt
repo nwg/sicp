@@ -437,3 +437,131 @@
         (cadr val)
         (error "Unknown operation: ASSEMBLE"
                symbol))))
+
+(define gcd-machine
+  (make-machine
+   '(a b t)
+   (list (list 'rem remainder) (list '= =))
+   '(test-b
+       (test (op =) (reg b) (const 0))
+       (branch (label gcd-done))
+       (assign t (op rem) (reg a) (reg b))
+       (assign a (reg b))
+       (assign b (reg t))
+       (goto (label test-b))
+     gcd-done)))
+
+(set-register-contents! gcd-machine 'a 206)
+(set-register-contents! gcd-machine 'b 40)
+(start gcd-machine)
+
+(display "gcd-machine: ")
+(display (get-register-contents gcd-machine 'a))
+(newline)
+
+(define ex5.2-fact-machine
+  (make-machine
+   '(n counter product t)
+   (list (list '< <) (list '* *) (list '+ +))
+   '( (assign counter (const 1))
+      (assign product (const 1))
+    test-counter      
+      (test (op <) (reg n) (reg counter))
+      (branch (label fact-done))
+      (assign t (op *) (reg product) (reg counter))
+      (assign counter (op +) (reg counter) (const 1))
+      (assign product (reg t))
+      (goto (label test-counter))
+
+    fact-done)))
+
+(set-register-contents! ex5.2-fact-machine 'n 6)
+(start ex5.2-fact-machine)
+(display "ex5.2-fact-machine: ")
+(display (get-register-contents ex5.2-fact-machine 'product))
+(newline)
+
+(define ex5.3-sqrt-controller-version-2-machine
+  (make-machine
+   '(t g x)
+   (list (list '* *) (list '- -) (list '/ /) (list '+ +) (list '< <))
+   '(
+       (assign g (const 1.0))
+     test-g
+       (assign t (op *) (reg g) (reg g))
+       (assign t (op -) (reg t) (reg x))
+       (test (op <) (reg t) (const 0))
+       (branch (label flip))
+       (goto (label dont-flip))
+     flip
+       (assign t (op -) (const 0) (reg t))
+     dont-flip
+       (test (op <) (reg t) (const 0.001))
+       (branch (label done))
+       (assign t (op /) (reg x) (reg g))
+       (assign t (op +) (reg g) (reg t))
+       (assign g (op /) (reg t) (const 2.0))
+       (goto (label test-g))
+
+    done)))
+
+(set-register-contents! ex5.3-sqrt-controller-version-2-machine 'x 2)
+(start ex5.3-sqrt-controller-version-2-machine)
+(display "ex5.3-sqrt-controller-version-2-machine: ")
+(display (get-register-contents ex5.3-sqrt-controller-version-2-machine 'g))
+(newline)
+
+(define ex5.4-expt-controller-rec-machine
+  (make-machine
+   '(continue n val b)
+   (list (list '= =) (list '- -) (list '* *))
+   '(  (assign continue (label done))
+     expt
+       (test (op =) (reg n) (const 0))
+       (branch (label base-case))
+       (save continue)
+       (assign continue (label after-expt))
+       (assign n (op -) (reg n) (const 1))
+       (goto (label expt))
+     after-expt
+       (restore continue)
+       (assign val (op *) (reg b) (reg val))
+       (goto (reg continue))
+
+     base-case
+       (assign val (const 1))
+       (goto (reg continue))
+      
+    done)))
+
+(set-register-contents! ex5.4-expt-controller-rec-machine 'b 3)
+(set-register-contents! ex5.4-expt-controller-rec-machine 'n 4)
+(start ex5.4-expt-controller-rec-machine)
+(display "ex5.4-expt-controller-rec-machine: ")
+(display (get-register-contents ex5.4-expt-controller-rec-machine 'val))
+(newline)
+
+
+(define ex5.4-expt-controller-iter-machine
+  (make-machine
+   '(n counter product val b)
+   (list (list '= =) (list '- -) (list '* *))
+   '(expt
+       (assign counter (reg n))
+       (assign product (const 1))
+       
+     expt-iter
+       (test (op =) (reg counter) (const 0))
+       (branch (label done))
+       (assign counter (op -) (reg counter) (const 1))
+       (assign product (op *) (reg b) (reg product))
+       (goto (label expt-iter))
+     done
+       (assign val (reg product)))))
+
+(set-register-contents! ex5.4-expt-controller-iter-machine 'b 3)
+(set-register-contents! ex5.4-expt-controller-iter-machine 'n 4)
+(start ex5.4-expt-controller-iter-machine)
+(display "ex5.4-expt-controller-iter-machine: ")
+(display (get-register-contents ex5.4-expt-controller-iter-machine 'val))
+(newline)
