@@ -14,12 +14,14 @@
     machine))
 
 (define (make-register name)
-  (let ((contents '*unassigned*))
+  (let ((contents '*unassigned*)
+        (stack (make-stack)))
     (define (dispatch message)
       (cond ((eq? message 'get) contents)
             ((eq? message 'set)
              (lambda (value) 
                (set! contents value)))
+            ((eq? message 'stack) stack)
             (else
              (error "Unknown request: 
                      REGISTER"
@@ -62,16 +64,20 @@
 (define (make-new-machine)
   (let ((pc (make-register 'pc))
         (flag (make-register 'flag))
-        (stack (make-stack))
         (the-instruction-sequence '()))
-    (let ((the-ops
-           (list 
-            (list 'initialize-stack
-                  (lambda () 
-                    (stack 'initialize)))))
-          (register-table
-           (list (list 'pc pc) 
-                 (list 'flag flag))))
+    (let* ((register-table
+            (list (list 'pc pc) 
+                  (list 'flag flag)))
+           (the-ops
+            (list 
+             (list 'initialize-stack
+                   (lambda ()
+                     (for-each
+                      (lambda (register-pair)
+                        (let ([register (cadr register-pair)])
+                          ((register 'stack) 'initialize)))
+                      register-table))))))
+                     
       (define (allocate-register name)
         (if (assoc name register-table)
             (error 
@@ -121,7 +127,6 @@
                (lambda (ops) 
                  (set! the-ops 
                        (append the-ops ops))))
-              ((eq? message 'stack) stack)
               ((eq? message 'operations) 
                the-ops)
               (else (error "Unknown request: 
@@ -179,7 +184,6 @@
 (define (update-insts! insts labels machine)
   (let ((pc (get-register machine 'pc))
         (flag (get-register machine 'flag))
-        (stack (machine 'stack))
         (ops (machine 'operations)))
     (for-each
      (lambda (inst)
@@ -191,7 +195,6 @@
          machine
          pc
          flag
-         stack
          ops)))
      insts)))
 
@@ -216,7 +219,7 @@
                label-name))))
 
 (define (make-execution-procedure 
-         inst labels machine pc flag stack ops)
+         inst labels machine pc flag ops)
   (cond ((eq? (car inst) 'assign)
          (make-assign 
           inst machine labels ops pc))
@@ -229,9 +232,9 @@
         ((eq? (car inst) 'goto)
          (make-goto inst machine labels pc))
         ((eq? (car inst) 'save)
-         (make-save inst machine stack pc))
+         (make-save inst machine pc))
         ((eq? (car inst) 'restore)
-         (make-restore inst machine stack pc))
+         (make-restore inst machine pc))
         ((eq? (car inst) 'perform)
          (make-perform
           inst machine labels ops pc))
@@ -336,20 +339,20 @@
 (define (goto-dest goto-instruction)
   (cadr goto-instruction))
 
-(define (make-save inst machine stack pc)
+(define (make-save inst machine pc)
   (let ((reg (get-register 
               machine
               (stack-inst-reg-name inst))))
     (lambda ()
-      (push stack (get-contents reg))
+      (push (reg 'stack) (get-contents reg))
       (advance-pc pc))))
 
-(define (make-restore inst machine stack pc)
+(define (make-restore inst machine pc)
   (let ((reg (get-register
               machine
               (stack-inst-reg-name inst))))
     (lambda ()
-      (set-contents! reg (pop stack))
+      (set-contents! reg (pop (reg 'stack)))
       (advance-pc pc))))
 
 (define (stack-inst-reg-name 
@@ -442,3 +445,26 @@
         (error "Unknown operation: ASSEMBLE"
                symbol))))
 
+
+(define test-stack
+  (make-machine
+   '(a b)
+   '()
+   '(start
+       (perform (op initialize-stack))
+       (assign a (const 2))
+       (save a)
+       ; (perform (op initialize-stack)) -- fails
+       ; (restore b) -- fails
+       (restore a)
+       (assign b (const 3))
+       (save b)
+       (assign b (const 4))
+       (restore b))))
+
+(start test-stack)
+(display "test-stack: ")
+(display (get-register-contents test-stack 'a))
+(display " ")
+(display (get-register-contents test-stack 'b))
+(newline)
