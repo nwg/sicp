@@ -254,7 +254,7 @@
                 labels
                 operations)
                (make-primitive-exp
-                (car value-exp)
+                value-exp
                 machine
                 labels))))
       (lambda ()   ; execution procedure
@@ -263,9 +263,9 @@
         (advance-pc pc)))))
 
 (define (assign-reg-name assign-instruction)
-  (cadr assign-instruction))
+  (caddr assign-instruction))
 (define (assign-value-exp assign-instruction)
-  (cddr assign-instruction))
+  (cadr assign-instruction))
 
 (define (advance-pc pc)
   (set-contents! pc (cdr (get-contents pc))))
@@ -289,7 +289,7 @@
                 ASSEMBLE" inst))))
 
 (define (test-condition test-instruction)
-  (cdr test-instruction))
+  (cadr test-instruction))
 
 (define 
   (make-branch 
@@ -373,7 +373,7 @@
                 ASSEMBLE"
                inst))))
 
-(define (perform-action inst) (cdr inst))
+(define (perform-action inst) (cadr inst))
 
 (define (make-primitive-exp exp machine labels)
   (cond ((constant-exp? exp)
@@ -429,11 +429,11 @@
 
 (define (operation-exp? exp)
   (and (pair? exp)
-       (tagged-list? (car exp) 'op)))
+       (tagged-list? exp 'op)))
 (define (operation-exp-op operation-exp)
-  (cadr (car operation-exp)))
+  (cadr operation-exp))
 (define (operation-exp-operands operation-exp)
-  (cdr operation-exp))
+  (cddr operation-exp))
 
 (define (lookup-prim symbol operations)
   (let ((val (assoc symbol operations)))
@@ -442,3 +442,35 @@
         (error "Unknown operation: ASSEMBLE"
                symbol))))
 
+(define ex5.4-expt-controller-rec-machine
+  (make-machine
+   '(continue n val b)
+   (list (list '= =) (list '- -) (list '* *) (list 'display display) (list 'newline newline))
+   '(  (assign (label done) continue)
+     expt
+       (test (op = (reg n) (const 0)))
+       (branch (label base-case))
+       (save continue)
+       (assign (label after-expt) continue)
+       (assign (op - (reg n) (const 1)) n)
+       (goto (label expt))
+     after-expt
+       (restore continue)
+       (assign (op * (reg b) (reg val)) val)
+       (goto (reg continue))
+
+     base-case
+       (assign (const 1) val)
+       (goto (reg continue))
+
+     done
+       (perform (op display (reg val)))
+       (perform (op newline)))))
+
+
+(set-register-contents! ex5.4-expt-controller-rec-machine 'b 3)
+(set-register-contents! ex5.4-expt-controller-rec-machine 'n 4)
+(start ex5.4-expt-controller-rec-machine)
+;(display "ex5.4-expt-controller-rec-machine: ")
+;(display (get-register-contents ex5.4-expt-controller-rec-machine 'val))
+;(newline)
