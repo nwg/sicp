@@ -341,7 +341,7 @@
               machine
               (stack-inst-reg-name inst))))
     (lambda ()
-      (push stack (get-contents reg))
+      (push stack (cons (stack-inst-reg-name inst) (get-contents reg)))
       (advance-pc pc))))
 
 (define (make-restore inst machine stack pc)
@@ -349,8 +349,14 @@
               machine
               (stack-inst-reg-name inst))))
     (lambda ()
-      (set-contents! reg (pop stack))
-      (advance-pc pc))))
+      (let* ([pair (pop stack)]
+             [reg-name-on-stack (car pair)]
+             [value (cdr pair)])
+        (if (not (eq? reg-name-on-stack (stack-inst-reg-name inst)))
+            (error "Mismatched register restore, stack register was:" reg-name-on-stack)
+            (begin
+              (set-contents! reg value)
+              (advance-pc pc)))))))
 
 (define (stack-inst-reg-name 
          stack-instruction)
@@ -442,3 +448,21 @@
         (error "Unknown operation: ASSEMBLE"
                symbol))))
 
+
+(define test-pop-mismatch
+  (make-machine
+   '(a b)
+   '()
+   '(
+       (save a)
+       (restore a)
+       (save a)
+       (restore b))))
+
+
+(set-register-contents! test-pop-mismatch 'a 2)
+(start test-pop-mismatch)
+(display "test-pop-mismatch: ")
+(display (get-register-contents test-pop-mismatch 'b))
+(newline)
+     
