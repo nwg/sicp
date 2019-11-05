@@ -84,7 +84,8 @@
         (flag (make-register 'flag))
         (stack (make-stack))
         (the-instruction-sequence '())
-        (execution-count 0))
+        (execution-count 0)
+        (trace-enabled false))
     (define (get-execution-count)
       (display "instructions executed since last call: ")
       (display execution-count)
@@ -132,6 +133,9 @@
           (if (null? insts)
               'done
               (begin
+                (when trace-enabled
+                  (display (instruction-text (car insts)))
+                  (newline))
                 ((instruction-execution-proc 
                   (car insts)))
                 (set! execution-count (+ execution-count 1))
@@ -172,6 +176,10 @@
                (save-restore-regs (map mcar the-instruction-sequence)))
               ((eq? message 'assignment-sources)
                (assignment-sources-grouped (map mcar the-instruction-sequence)))
+              ((eq? message 'trace-on)
+               (set! trace-enabled true))
+              ((eq? message 'trace-off)
+               (set! trace-enabled false))
               (else (error "Unknown request: 
                             MACHINE"
                            message))))
@@ -531,3 +539,35 @@
         (error "Unknown operation: ASSEMBLE"
                symbol))))
 
+
+(define fact-machine
+  (make-machine
+   (list (list '= =) (list '* *) (list '- -))
+   '(  (assign continue (label fact-done))   ; set up final return address
+     fact-loop
+       (test (op =) (reg n) (const 1))
+       (branch (label base-case))
+       (save continue)                       ; Set up for the recursive call
+       (save n)                              ; by saving n and continue.
+       (assign n (op -) (reg n) (const 1))   ; Set up continue so that the
+       (assign continue (label after-fact))  ; computation will continue
+       (goto (label fact-loop))              ; at after-fact when the
+     after-fact                              ; subroutine returns.
+       (restore n)
+       (restore continue)
+       (assign val (op *) (reg n) (reg val)) ; val now contains n(n - 1)!
+       (goto (reg continue))                 ; return to caller
+     base-case
+       (assign val (const 1))                ; base case: 1! = 1
+       (goto (reg continue))                 ; return to caller
+     fact-done
+       (perform (op print-stack-statistics)))))
+
+
+
+(set-register-contents! fact-machine 'n 10)
+(fact-machine 'trace-on)
+(start fact-machine)
+(display "fact-machine: ")
+(display (get-register-contents fact-machine 'val))
+(newline) 
