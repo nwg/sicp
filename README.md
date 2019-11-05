@@ -9,3 +9,4 @@
     * part2: [code](https://github.com/nwg/sicp/blob/ex5.11-part2/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/c121440f2d0559b3e148326fffd286d823323472#diff-171e2568da8f35af04868f439938d8fb)
     * part3: [code](https://github.com/nwg/sicp/blob/ex5.11-part3/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/cce98dcd6bf6e082f92afb01c812fad3ff1bc4cf#diff-171e2568da8f35af04868f439938d8fb)
 * exercise 5.12 [code](https://github.com/nwg/sicp/blob/ex5.12/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/6620223b498f244e2377ebb1a4b647adff02aca4#diff-171e2568da8f35af04868f439938d8fb)
+* exercise 5.13: [code](https://github.com/nwg/sicp/blob/ex5.13/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/ab21aedfcafd9e55452739e4a4ddd97c136d5fd2#diff-171e2568da8f35af04868f439938d8fb)
