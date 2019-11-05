@@ -30,28 +30,51 @@
   ((register 'set) value))
 
 (define (make-stack)
-  (let ((s '()))
+  (let ((s '())
+        (number-pushes 0)
+        (max-depth 0)
+        (current-depth 0))
     (define (push x)
-      (set! s (cons x s)))
+      (set! s (cons x s))
+      (set! number-pushes (+ 1 number-pushes))
+      (set! current-depth (+ 1 current-depth))
+      (set! max-depth 
+            (max current-depth max-depth)))
     (define (pop)
       (if (null? s)
           (error "Empty stack: POP")
           (let ((top (car s)))
             (set! s (cdr s))
+            (set! current-depth
+                  (- current-depth 1))
             top)))
     (define (initialize)
       (set! s '())
+      (set! number-pushes 0)
+      (set! max-depth 0)
+      (set! current-depth 0)
       'done)
+
+    (define (print-statistics)
+      (display (list 'total-pushes 
+                     '= 
+                     number-pushes
+                     'maximum-depth
+                     '=
+                     max-depth))
+      (newline))
+    
     (define (dispatch message)
       (cond ((eq? message 'push) push)
             ((eq? message 'pop) (pop))
-            ((eq? message 'initialize) 
+            ((eq? message 'initialize)
              (initialize))
-            (else 
+            ((eq? message 'print-statistics)
+             (print-statistics))
+            (else
              (error "Unknown request: STACK"
                     message))))
     dispatch))
-
 (define (pop stack) (stack 'pop))
 (define (push stack value)
   ((stack 'push) value))
@@ -65,7 +88,10 @@
            (list 
             (list 'initialize-stack
                   (lambda () 
-                    (stack 'initialize)))))
+                    (stack 'initialize)))
+            (list 'print-stack-statistics
+                  (lambda () 
+                    (stack 'print-statistics)))))
           (register-table
            (list (list 'pc pc) 
                  (list 'flag flag))))
@@ -495,3 +521,33 @@
         (error "Unknown operation: ASSEMBLE"
                symbol))))
 
+(define fact-machine
+  (make-machine
+   (list (list '= =) (list '* *) (list '- -))
+   '(  (assign continue (label fact-done))   ; set up final return address
+     fact-loop
+       (test (op =) (reg n) (const 1))
+       (branch (label base-case))
+       (save continue)                       ; Set up for the recursive call
+       (save n)                              ; by saving n and continue.
+       (assign n (op -) (reg n) (const 1))   ; Set up continue so that the
+       (assign continue (label after-fact))  ; computation will continue
+       (goto (label fact-loop))              ; at after-fact when the
+     after-fact                              ; subroutine returns.
+       (restore n)
+       (restore continue)
+       (assign val (op *) (reg n) (reg val)) ; val now contains n(n - 1)!
+       (goto (reg continue))                 ; return to caller
+     base-case
+       (assign val (const 1))                ; base case: 1! = 1
+       (goto (reg continue))                 ; return to caller
+     fact-done
+       (perform (op print-stack-statistics)))))
+
+
+
+(set-register-contents! fact-machine 'n 10)
+(start fact-machine)
+(display "fact-machine: ")
+(display (get-register-contents fact-machine 'val))
+(newline)
