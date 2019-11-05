@@ -2,14 +2,9 @@
 
 (require "../../utility.rkt")
 
-(define (make-machine register-names 
-                      ops 
+(define (make-machine ops 
                       controller-text)
   (let ((machine (make-new-machine)))
-    (for-each (lambda (register-name)
-                ((machine 'allocate-register) 
-                 register-name))
-              register-names)
     ((machine 'install-operations) ops)
     ((machine 'install-instruction-sequence)
      (assemble controller-text machine))
@@ -79,12 +74,12 @@
             (error 
              "Multiply defined register: " 
              name)
-            (set! register-table
-                  (cons 
-                   (list name 
-                         (make-register name))
-                   register-table)))
-        'register-allocated)
+            (let ([register (make-register name)])
+              (set! register-table
+                    (cons 
+                     (list name register)
+                     register-table))
+              register)))
       (define (lookup-register name)
         (let ((val 
                (assoc name register-table)))
@@ -92,6 +87,11 @@
               (cadr val)
               (error "Unknown register:" 
                      name))))
+      (define (get-or-create-register name)
+        (let ([val (assoc name register-table)])
+          (if val
+              (cadr val)
+              (allocate-register name))))
       (define (execute)
         (let ((insts (get-contents pc)))
           (if (null? insts)
@@ -118,6 +118,8 @@
                allocate-register)
               ((eq? message 'get-register) 
                lookup-register)
+              ((eq? message 'get-or-create-register) 
+               get-or-create-register)
               ((eq? message 
                     'install-operations)
                (lambda (ops) 
@@ -194,6 +196,9 @@
 
 (define (get-register machine reg-name)
   ((machine 'get-register) reg-name))
+
+(define (get-or-create-register machine reg-name)
+  ((machine 'get-or-create-register) reg-name))
 
 (define (assemble controller-text machine)
   (extract-labels controller-text
@@ -290,7 +295,7 @@
 (define (make-assign 
          inst machine labels operations pc)
   (let ((target 
-         (get-register 
+         (get-or-create-register 
           machine 
           (assign-reg-name inst)))
         (value-exp (assign-value-exp inst)))
@@ -370,7 +375,7 @@
                (set-contents! pc insts))))
           ((register-exp? dest)
            (let ((reg
-                  (get-register 
+                  (get-or-create-register 
                    machine
                    (register-exp-reg dest))))
              (lambda ()
@@ -385,7 +390,7 @@
   (cadr goto-instruction))
 
 (define (make-save inst machine stack pc)
-  (let ((reg (get-register 
+  (let ((reg (get-or-create-register 
               machine
               (stack-inst-reg-name inst))))
     (lambda ()
@@ -393,7 +398,7 @@
       (advance-pc pc))))
 
 (define (make-restore inst machine stack pc)
-  (let ((reg (get-register
+  (let ((reg (get-or-create-register
               machine
               (stack-inst-reg-name inst))))
     (lambda ()
@@ -434,7 +439,7 @@
                  (label-exp-label exp))))
            (lambda () insts)))
         ((register-exp? exp)
-         (let ((r (get-register
+         (let ((r (get-or-create-register
                    machine
                    (register-exp-reg exp))))
            (lambda () (get-contents r))))
@@ -489,3 +494,54 @@
         (cadr val)
         (error "Unknown operation: ASSEMBLE"
                symbol))))
+
+(define fib-machine
+  (make-machine
+   (list (list '< <) (list '- -) (list '+ +))
+   '(
+     (assign continue (label fib-done))
+   fib-loop
+     (test (op <) (reg n) (const 2))
+     (branch (label immediate-answer))
+     ;; set up to compute Fib(n - 1)
+     (save continue)
+     (assign continue (label afterfib-n-1))
+     (save n)           ; save old value of n
+     (assign n 
+             (op -)
+             (reg n)
+             (const 1)) ; clobber n to n-1
+     (goto 
+      (label fib-loop)) ; perform recursive call
+   afterfib-n-1 ; upon return, val contains Fib(n - 1)
+     (restore n)
+     (restore continue)
+     ;; set up to compute Fib(n - 2)
+     (assign n (op -) (reg n) (const 2))
+     (save continue)
+     (assign continue (label afterfib-n-2))
+     (save val)         ; save Fib(n - 1)
+     (goto (label fib-loop))
+   afterfib-n-2 ; upon return, val contains Fib(n - 2)
+     (assign n 
+             (reg val)) ; n now contains Fib(n - 2)
+     (restore val)      ; val now contains Fib(n - 1)
+     (restore continue)
+     (assign val        ; Fib(n - 1) + Fib(n - 2)
+             (op +) 
+             (reg val)
+             (reg n))
+     (goto              ; return to caller,
+      (reg continue))   ; answer is in val
+   immediate-answer
+     (assign val 
+             (reg n))   ; base case: Fib(n) = n
+     (goto (reg continue))
+   fib-done)))
+
+
+(set-register-contents! fib-machine 'n 5)
+(start fib-machine)
+(display "fib-machine: ")
+(display (get-register-contents fib-machine 'val))
+(newline)
