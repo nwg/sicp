@@ -134,6 +134,12 @@
               'done
               (begin
                 (when trace-enabled
+                  (for-each
+                   (lambda (label)
+                     (display label)
+                     (display ":")
+                     (newline))
+                   (instruction-labels (car insts)))
                   (display (instruction-text (car insts)))
                   (newline))
                 ((instruction-execution-proc 
@@ -290,18 +296,27 @@
          flag
          stack
          ops)))
-     insts)))
+     insts)
+    (for-each
+     (lambda (pair)
+       (let ([label (car pair)]
+             [inst (cadr pair)])
+         (set-instruction-labels! inst (append (instruction-labels inst) (list label)))))
+     labels)))
 
 (define (make-instruction text)
-  (mcons text '()))
+  (mcons text (mcons '() '())))
 (define (instruction-text inst) (mcar inst))
 (define (instruction-execution-proc inst)
-  (mcdr inst))
+  (mcadr inst))
+(define (instruction-labels inst)
+  (mcddr inst))
 (define (set-instruction-execution-proc!
          inst
          proc)
-  (set-mcdr! inst proc))
-
+  (set-mcar! (mcdr inst) proc))
+(define (set-instruction-labels! inst labels)
+  (set-mcdr! (mcdr inst) labels))
 (define (make-label-entry label-name insts)
   (cons label-name insts))
 
@@ -558,6 +573,7 @@
        (assign val (op *) (reg n) (reg val)) ; val now contains n(n - 1)!
        (goto (reg continue))                 ; return to caller
      base-case
+     base-case2
        (assign val (const 1))                ; base case: 1! = 1
        (goto (reg continue))                 ; return to caller
      fact-done
