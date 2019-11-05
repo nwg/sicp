@@ -4,6 +4,8 @@
 
 (provide rm-dupes)
 (provide groupby)
+(provide mcadr)
+(provide mcddr)
 
 (define rm-dupes (compose set->list list->set))
 
@@ -24,3 +26,5 @@
              (cdr back))))))
   (foldr reduce '() items))
             
+(define mcadr (compose mcar mcdr))
+(define mcddr (compose mcdr mcdr))
