@@ -1,5 +1,7 @@
 #lang racket
 
+(require "../../utility.rkt")
+
 (define (make-machine register-names 
                       ops 
                       controller-text)
@@ -124,10 +126,56 @@
               ((eq? message 'stack) stack)
               ((eq? message 'operations) 
                the-ops)
+              ((eq? message 'sorted-instructions)
+               (groupby car (rm-dupes (map mcar the-instruction-sequence))))
+              ((eq? message 'entry-point-regs)
+               (entry-point-regs (map mcar the-instruction-sequence)))
+              ((eq? message 'save-restore-regs)
+               (save-restore-regs (map mcar the-instruction-sequence)))
+              ((eq? message 'assignment-sources)
+               (assignment-sources-grouped (map mcar the-instruction-sequence)))
               (else (error "Unknown request: 
                             MACHINE"
                            message))))
       dispatch)))
+
+(define (assignment-sources-grouped insts)
+ (map
+  (lambda (pair)
+    (list
+     (car pair)
+     (map
+      (lambda (inst)
+        (assign-value-exp inst))
+      (cadr pair))))
+  (groupby
+   assign-reg-name
+   (filter
+    (lambda (inst) (equal? (car inst) 'assign))
+    (rm-dupes insts)))))
+
+(define (save-restore-regs insts)
+  (rm-dupes
+   (map
+    stack-inst-reg-name
+    (filter
+     (lambda (inst)
+       (or
+        (eq? (car inst) 'save)
+        (eq? (car inst) 'restore)))
+     insts))))
+
+(define (entry-point-regs insts)
+  (rm-dupes
+   (map
+    (lambda (inst)
+      (cadr (goto-dest inst)))
+    (filter
+     (lambda (inst)
+       (and
+        (eq? (car inst) 'goto)
+        (register-exp? (goto-dest inst))))
+     insts))))
 
 (define (start machine)
   (machine 'start))
@@ -442,3 +490,52 @@
         (error "Unknown operation: ASSEMBLE"
                symbol))))
 
+(define fib-machine
+  (make-machine
+   '(n val continue)
+   (list (list '< <) (list '- -) (list '+ +))
+   '(
+     (assign continue (label fib-done))
+   fib-loop
+     (test (op <) (reg n) (const 2))
+     (branch (label immediate-answer))
+     ;; set up to compute Fib(n - 1)
+     (save continue)
+     (assign continue (label afterfib-n-1))
+     (save n)           ; save old value of n
+     (assign n 
+             (op -)
+             (reg n)
+             (const 1)) ; clobber n to n-1
+     (goto 
+      (label fib-loop)) ; perform recursive call
+   afterfib-n-1 ; upon return, val contains Fib(n - 1)
+     (restore n)
+     (restore continue)
+     ;; set up to compute Fib(n - 2)
+     (assign n (op -) (reg n) (const 2))
+     (save continue)
+     (assign continue (label afterfib-n-2))
+     (save val)         ; save Fib(n - 1)
+     (goto (label fib-loop))
+   afterfib-n-2 ; upon return, val contains Fib(n - 2)
+     (assign n 
+             (reg val)) ; n now contains Fib(n - 2)
+     (restore val)      ; val now contains Fib(n - 1)
+     (restore continue)
+     (assign val        ; Fib(n - 1) + Fib(n - 2)
+             (op +) 
+             (reg val)
+             (reg n))
+     (goto              ; return to caller,
+      (reg continue))   ; answer is in val
+   immediate-answer
+     (assign val 
+             (reg n))   ; base case: Fib(n) = n
+     (goto (reg continue))
+   fib-done)))
+
+(fib-machine 'sorted-instructions)
+(fib-machine 'entry-point-regs)
+(fib-machine 'save-restore-regs)
+(fib-machine 'assignment-sources)
