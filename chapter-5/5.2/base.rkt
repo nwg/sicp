@@ -11,12 +11,33 @@
     machine))
 
 (define (make-register name)
-  (let ((contents '*unassigned*))
+  (let ((contents '*unassigned*)
+        (trace-enabled false))
     (define (dispatch message)
       (cond ((eq? message 'get) contents)
             ((eq? message 'set)
-             (lambda (value) 
+             (lambda (value)
+               (define (print-reg-val val)
+                 (if (pair? val)
+                     (if (instruction-labels (car val))
+                         (display (string-join (map ~s (instruction-labels (car val))) "/"))
+                         (begin
+                           (display (instruction-text (car val)))
+                           (display "...")))
+                     (display val)))
+               (when trace-enabled
+                 (display "reg ")
+                 (display name)
+                 (display " -- ")
+                 (print-reg-val contents)
+                 (display " -> ")
+                 (print-reg-val value)
+                 (newline))
                (set! contents value)))
+            ((eq? message 'trace-on)
+             (set! trace-enabled true))
+            ((eq? message 'trace-off)
+             (set! trace-enabled false))
             (else
              (error "Unknown request: 
                      REGISTER"
@@ -146,6 +167,16 @@
                   (car insts)))
                 (set! execution-count (+ execution-count 1))
                 (execute)))))
+      (define (trace-register name)
+        (let ([reg (assoc name register-table)])
+          (if (not reg)
+              (error "Register not found:" name)
+              ((cadr reg) 'trace-on))))
+      (define (stop-trace-register name)
+        (let ([reg (assoc name register-table)])
+          (if (not reg)
+              (error "Register not found:" name)
+              ((cadr reg) 'trace-off))))
       (define (dispatch message)
         (cond ((eq? message 'start)
                (set-contents! 
@@ -186,6 +217,10 @@
                (set! trace-enabled true))
               ((eq? message 'trace-off)
                (set! trace-enabled false))
+              ((eq? message 'trace-register)
+               trace-register)
+              ((eq? message 'stop-trace-register)
+               stop-trace-register)
               (else (error "Unknown request: 
                             MACHINE"
                            message))))
@@ -581,8 +616,10 @@
 
 
 
-(set-register-contents! fact-machine 'n 10)
-(fact-machine 'trace-on)
+(set-register-contents! fact-machine 'n 5)
+;(fact-machine 'trace-on)
+((fact-machine 'trace-register) 'continue)
+((fact-machine 'trace-register) 'val)
 (start fact-machine)
 (display "fact-machine: ")
 (display (get-register-contents fact-machine 'val))
