@@ -14,3 +14,4 @@
 * exercise 5.15: [code](https://github.com/nwg/sicp/blob/ex5.15/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/752dc16dbe85d49a4057d0fdd9db532660499676#diff-171e2568da8f35af04868f439938d8fb)
 * exercise 5.16: [code](https://github.com/nwg/sicp/blob/ex5.16/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/6fd38ded70504dce8b9421c5ca94941f6974f70c#diff-171e2568da8f35af04868f439938d8fb)
 * exercise 5.17: [code](https://github.com/nwg/sicp/blob/ex5.17/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/bbf471d83abd3fe15e5bbad6a1ae3566ac7e7286#diff-171e2568da8f35af04868f439938d8fb)
+* exercise 5.18: [code](https://github.com/nwg/sicp/blob/ex5.18/chapter-5/5.2/base.rkt) [diff](https://github.com/nwg/sicp/commit/0966eca55fd3ce55aa5fb2164269d48a4a6bc3e7#diff-171e2568da8f35af04868f439938d8fb)
