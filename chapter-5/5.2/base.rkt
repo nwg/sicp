@@ -6,12 +6,12 @@
                       controller-text)
   (let ((machine (make-new-machine)))
     ((machine 'install-operations) ops)
-    ((machine 'install-instruction-sequence)
-     (assemble controller-text machine))
+    (let-values ([(seq labels) (assemble controller-text machine)])
+      ((machine 'install-instruction-sequence) seq labels))       
     machine))
 
 (define (make-register name)
-  (let ((contents '*unassigned*)
+  (let ((contents *UNASSIGNED-VALUE*)
         (trace-enabled false))
     (define (dispatch message)
       (cond ((eq? message 'get) contents)
@@ -43,6 +43,8 @@
                      REGISTER"
                     message))))
     dispatch))
+
+(define *UNASSIGNED-VALUE* '*unassigned*)
 
 (define (get-contents register)
   (register 'get))
@@ -106,7 +108,8 @@
         (stack (make-stack))
         (the-instruction-sequence '())
         (execution-count 0)
-        (trace-enabled false))
+        (trace-enabled false)
+        (labels '()))
     (define (get-execution-count)
       (display "instructions executed since last call: ")
       (display execution-count)
@@ -126,6 +129,25 @@
           (register-table
            (list (list 'pc pc) 
                  (list 'flag flag))))
+      (define (inst-at label offset)
+        (let ([ref-entry (assoc label labels)])
+          (if (not ref-entry)
+              false
+              (with-handlers ([exn:fail:contract? (λ (e) false)])
+                (list-ref (cdr ref-entry) offset)))))        
+      (define (set-breakpoint label offset)
+        (let ([inst (inst-at label offset)])
+          (if (not inst)
+              (displayln "could not find instruction")              
+              (set-instruction-breakpoint! inst (make-breakpoint label offset)))))
+      (define (cancel-breakpoint label offset)
+        (let ([inst (inst-at label offset)])
+          (if (not inst)
+              (displayln "could not find instruction")
+              (let ([bp (instruction-breakpoint inst)])
+                (if (not bp)
+                    (displayln "Could not cancel breakpoint (existing breakpoint not found)")
+                    (set-instruction-breakpoint! inst false))))))
       (define (allocate-register name)
         (if (assoc name register-table)
             (error 
@@ -149,6 +171,16 @@
           (if val
               (cadr val)
               (allocate-register name))))
+      (define (proceed-with-instruction inst)
+        ((instruction-execution-proc inst))
+        (set! execution-count (+ execution-count 1))
+        (execute))
+      (define (proceed-execution)
+        (let ([insts (get-contents pc)])
+          (cond [(null? insts) 'done]
+                [(eq? (car insts) *UNASSIGNED-VALUE*)
+                 (error "Machine not started")]
+                [else (proceed-with-instruction (car insts))])))
       (define (execute)
         (let ((insts (get-contents pc)))
           (if (null? insts)
@@ -163,10 +195,16 @@
                    (instruction-labels (car insts)))
                   (display (instruction-text (car insts)))
                   (newline))
-                ((instruction-execution-proc 
-                  (car insts)))
-                (set! execution-count (+ execution-count 1))
-                (execute)))))
+                (let ([bp (instruction-breakpoint (car insts))])
+                  (if bp
+                      (begin
+                        (display "breakpoint -- ")
+                        (display (breakpoint-label bp))
+                        (display " + ")
+                        (display (breakpoint-offset bp))
+                        (newline))
+                      (proceed-with-instruction (car insts))))))))
+                        
       (define (trace-register name)
         (let ([reg (assoc name register-table)])
           (if (not reg)
@@ -183,13 +221,14 @@
                 pc
                 the-instruction-sequence)
                (execute))
+              ((eq? message 'proceed)
+               (proceed-execution))
               ((eq? 
                 message 
                 'install-instruction-sequence)
-               (lambda (seq) 
-                 (set! 
-                  the-instruction-sequence 
-                  seq)))
+               (lambda (seq new-labels) 
+                 (set! the-instruction-sequence seq)
+                 (set! labels new-labels)))
               ((eq? message 
                     'allocate-register) 
                allocate-register)
@@ -221,11 +260,27 @@
                trace-register)
               ((eq? message 'stop-trace-register)
                stop-trace-register)
+              ((eq? message 'set-breakpoint)
+               set-breakpoint)
+              ((eq? message 'cancel-breakpoint)
+               cancel-breakpoint)
+              ((eq? message 'cancel-all-breakpoints)
+               (for-each
+                (lambda (inst)
+                  (set-instruction-breakpoint! inst false))
+                the-instruction-sequence))
               (else (error "Unknown request: 
                             MACHINE"
                            message))))
       dispatch)))
 
+(define (set-breakpoint machine label offset)
+  ((machine 'set-breakpoint) label offset))
+(define (cancel-breakpoint machine label offset)
+  ((machine 'cancel-breakpoint) label offset))
+(define (cancel-all-breakpoints machine)
+  (machine 'cancel-all-breakpoints))
+  
 (define (assignment-sources-grouped insts)
  (map
   (lambda (pair)
@@ -267,6 +322,9 @@
 (define (start machine)
   (machine 'start))
 
+(define (proceed-machine machine)
+  (machine 'proceed))
+
 (define (get-register-contents 
          machine register-name)
   (get-contents 
@@ -289,7 +347,7 @@
   (extract-labels controller-text
     (lambda (insts labels)
       (update-insts! insts labels machine)
-      insts)))
+      (values insts labels))))
 
 (define (extract-labels text receive)
   (if (null? text)
@@ -339,19 +397,28 @@
          (set-instruction-labels! inst (append (instruction-labels inst) (list label)))))
      labels)))
 
+(define (make-breakpoint label offset)
+  (cons label offset))
+(define breakpoint-label car)
+(define breakpoint-offset cdr)
+
 (define (make-instruction text)
-  (mcons text (mcons '() '())))
+  (mcons text (mcons '() (mcons '() false))))
 (define (instruction-text inst) (mcar inst))
 (define (instruction-execution-proc inst)
   (mcadr inst))
 (define (instruction-labels inst)
-  (mcddr inst))
+  (mcaddr inst))
 (define (set-instruction-execution-proc!
          inst
          proc)
   (set-mcar! (mcdr inst) proc))
 (define (set-instruction-labels! inst labels)
-  (set-mcdr! (mcdr inst) labels))
+  (set-mcar! (mcddr inst) labels))
+(define (set-instruction-breakpoint! inst b)
+  (set-mcdr! (mcddr inst) b))
+(define (instruction-breakpoint inst)
+  (mcdddr inst))
 (define (make-label-entry label-name insts)
   (cons label-name insts))
 
@@ -618,9 +685,18 @@
 
 (set-register-contents! fact-machine 'n 5)
 ;(fact-machine 'trace-on)
-((fact-machine 'trace-register) 'continue)
-((fact-machine 'trace-register) 'val)
+;((fact-machine 'trace-register) 'continue)
+;((fact-machine 'trace-register) 'val)
+(set-breakpoint fact-machine 'after-fact 2)
+(set-breakpoint fact-machine 'after-fact 2)
 (start fact-machine)
+(proceed-machine fact-machine)
+(cancel-breakpoint fact-machine 'after-fact 2)
+(cancel-breakpoint fact-machine 'after-fact 2)
+(cancel-breakpoint fact-machine 'after-fact 1)
+(set-breakpoint fact-machine 'after-fact 2)
+(cancel-all-breakpoints fact-machine)
+(proceed-machine fact-machine)
 (display "fact-machine: ")
 (display (get-register-contents fact-machine 'val))
 (newline) 

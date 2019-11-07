@@ -6,6 +6,8 @@
 (provide groupby)
 (provide mcadr)
 (provide mcddr)
+(provide mcaddr)
+(provide mcdddr)
 
 (define rm-dupes (compose set->list list->set))
 
@@ -28,3 +30,5 @@
             
 (define mcadr (compose mcar mcdr))
 (define mcddr (compose mcdr mcdr))
+(define mcaddr (compose mcar mcdr mcdr))
+(define mcdddr (compose mcdr mcddr))
