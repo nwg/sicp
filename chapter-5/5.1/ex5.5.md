@@ -1,5 +1,6 @@
 # hand-simulate factorial 3
 
+```
 n <- 3
 continue <- 'fact-done
 
@@ -37,9 +38,12 @@ stack:
 val <- 3 * 2 = 6
 goto 'fact-done
 
+fact 3 = 6
+```
 
 # hand-simulate fib 4
 
+```
 n <- 4
 continue <- 'fib-done
 
@@ -226,5 +230,7 @@ continue <- pop = 'fib-done
 val <- val + n = 2 + 1 = 3
 goto continue = 'fib-done
 
--- fib 4 = 3
+fib 4 = 3
+```
+
 
