@@ -1,4 +1,4 @@
--- hand-simulate factorial 3 --
+# hand-simulate factorial 3
 
 n <- 3
 continue <- 'fact-done
@@ -38,7 +38,7 @@ val <- 3 * 2 = 6
 goto 'fact-done
 
 
--- hand-simulate fib 4 --
+# hand-simulate fib 4
 
 n <- 4
 continue <- 'fib-done
