@@ -2,6 +2,11 @@
 
 (require "../../utility.rkt")
 
+(provide make-machine)
+(provide set-register-contents!)
+(provide get-register-contents)
+(provide start)
+
 (define (make-machine ops 
                       controller-text)
   (let ((machine (make-new-machine)))
@@ -19,11 +24,13 @@
              (lambda (value)
                (define (print-reg-val val)
                  (if (pair? val)
-                     (if (instruction-labels (car val))
-                         (display (string-join (map ~s (instruction-labels (car val))) "/"))
-                         (begin
-                           (display (instruction-text (car val)))
-                           (display "...")))
+                     (if (mpair? (car val))
+                         (if (instruction-labels (car val))
+                             (display (string-join (map ~s (instruction-labels (car val))) "/"))
+                             (begin
+                               (display (instruction-text (car val)))
+                               (display "...")))
+                         (display val))
                      (display val)))
                (when trace-enabled
                  (display "reg ")
@@ -392,9 +399,10 @@
      insts)
     (for-each
      (lambda (pair)
-       (let ([label (car pair)]
-             [inst (cadr pair)])
-         (set-instruction-labels! inst (append (instruction-labels inst) (list label)))))
+       (when (not (null? (cdr pair)))
+         (let ([label (car pair)]
+               [inst (cadr pair)])
+           (set-instruction-labels! inst (append (instruction-labels inst) (list label))))))
      labels)))
 
 (define (make-breakpoint label offset)
@@ -455,26 +463,28 @@
 
 (define (make-assign 
          inst machine labels operations pc)
-  (let ((target 
-         (get-or-create-register 
-          machine 
-          (assign-reg-name inst)))
-        (value-exp (assign-value-exp inst)))
-    (let ((value-proc
-           (if (operation-exp? value-exp)
-               (make-operation-exp
-                value-exp 
-                machine
-                labels
-                operations)
-               (make-primitive-exp
-                (car value-exp)
-                machine
-                labels))))
-      (lambda ()   ; execution procedure
-                   ; for assign
-        (set-contents! target (value-proc))
-        (advance-pc pc)))))
+  (if (not (symbol? (assign-reg-name inst)))
+      (error "assignment target must be symbol, got" (assign-reg-name inst))
+      (let ((target 
+             (get-or-create-register 
+              machine 
+              (assign-reg-name inst)))
+            (value-exp (assign-value-exp inst)))
+        (let ((value-proc
+               (if (operation-exp? value-exp)
+                   (make-operation-exp
+                    value-exp 
+                    machine
+                    labels
+                    operations)
+                   (make-primitive-exp
+                    (car value-exp)
+                    machine
+                    labels))))
+          (lambda ()   ; execution procedure
+            ; for assign
+            (set-contents! target (value-proc))
+            (advance-pc pc))))))
 
 (define (assign-reg-name assign-instruction)
   (cadr assign-instruction))
@@ -657,46 +667,3 @@
                symbol))))
 
 
-(define fact-machine
-  (make-machine
-   (list (list '= =) (list '* *) (list '- -))
-   '(  (assign continue (label fact-done))   ; set up final return address
-     fact-loop
-       (test (op =) (reg n) (const 1))
-       (branch (label base-case))
-       (save continue)                       ; Set up for the recursive call
-       (save n)                              ; by saving n and continue.
-       (assign n (op -) (reg n) (const 1))   ; Set up continue so that the
-       (assign continue (label after-fact))  ; computation will continue
-       (goto (label fact-loop))              ; at after-fact when the
-     after-fact                              ; subroutine returns.
-       (restore n)
-       (restore continue)
-       (assign val (op *) (reg n) (reg val)) ; val now contains n(n - 1)!
-       (goto (reg continue))                 ; return to caller
-     base-case
-     base-case2
-       (assign val (const 1))                ; base case: 1! = 1
-       (goto (reg continue))                 ; return to caller
-     fact-done
-       (perform (op print-stack-statistics)))))
-
-
-
-(set-register-contents! fact-machine 'n 5)
-;(fact-machine 'trace-on)
-;((fact-machine 'trace-register) 'continue)
-;((fact-machine 'trace-register) 'val)
-(set-breakpoint fact-machine 'after-fact 2)
-(set-breakpoint fact-machine 'after-fact 2)
-(start fact-machine)
-(proceed-machine fact-machine)
-(cancel-breakpoint fact-machine 'after-fact 2)
-(cancel-breakpoint fact-machine 'after-fact 2)
-(cancel-breakpoint fact-machine 'after-fact 1)
-(set-breakpoint fact-machine 'after-fact 2)
-(cancel-all-breakpoints fact-machine)
-(proceed-machine fact-machine)
-(display "fact-machine: ")
-(display (get-register-contents fact-machine 'val))
-(newline) 
