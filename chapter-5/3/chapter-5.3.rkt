@@ -43,6 +43,7 @@
 
      done)))
 
+#|
 (define test-tree (cons (cons 1 2) (cons (cons 3 '()) (cons 4 5))))
 ;(define test-tree 2)
 (set-register-contents! count-leaves-machine 'tree test-tree)
@@ -51,6 +52,7 @@
 (display "count-leaves-machine: ")
 (display (get-register-contents count-leaves-machine 'val))
 (newline)
+|#
 
 (define count-leaves-iter-machine
   (make-machine
@@ -87,6 +89,7 @@
 
      done)))
 
+#|
 ;(define test-tree (cons (cons 1 2) (cons (cons 3 '()) (cons 4 5))))
 (set-register-contents! count-leaves-iter-machine 'tree test-tree)
 (count-leaves-iter-machine 'trace-on)
@@ -97,4 +100,79 @@
 (display "count-leaves-iter-machine: ")
 (display (get-register-contents count-leaves-iter-machine 'val))
 (newline)
+|#
 
+(define append-machine
+  (make-machine
+   (list (list 'null? null?) (list 'car car) (list 'cdr cdr) (list 'cons cons))
+   '(  (assign continue (label done))
+     append
+       (test (op null?) (reg x))
+       (branch (label is-null))
+       (goto (label not-null))
+     is-null
+       (assign val (reg y))
+       (goto (reg continue))
+     not-null
+       (save x)
+       (save continue)
+       (assign x (op cdr) (reg x))
+       (assign continue (label after-append))
+       (goto (label append))
+     after-append
+       (restore continue)
+       (restore x)
+       (assign tmp (op car) (reg x))
+       (assign val (op cons) (reg tmp) (reg val))
+       (goto (reg continue))
+     done)))
+
+(set-register-contents! append-machine 'x '(1 2 3))
+(set-register-contents! append-machine 'y '(4 5 6))
+(start append-machine)
+(display "append-machine: ")
+(display (get-register-contents append-machine 'val))
+(newline)
+
+(define append!-machine
+  (make-machine
+   (list (list 'null? null?) (list 'cdr mcdr) (list 'set-cdr! set-mcdr!))
+   '(  (assign continue (label done))
+     append!
+       (save x)
+       (save continue)
+       (assign continue (label last-pair-done))
+       (goto (label last-pair))
+     last-pair-done
+       (perform (op set-cdr!) (reg val) (reg y))
+       (restore continue)
+       (restore val)
+       (goto (reg continue))
+
+     last-pair
+       (assign tmp (op cdr) (reg x))
+       (test (op null?) (reg tmp))
+       (branch (label is-null))
+       (goto (label not-null))
+     is-null
+       (assign val (reg x))
+       (goto (reg continue))
+     not-null
+       (assign x (op cdr) (reg x))
+       (goto (label last-pair))
+
+     done)))
+
+(require compatibility/mlist)
+
+
+(set-register-contents! append!-machine 'x (mlist 1 2 3))
+(set-register-contents! append!-machine 'y (mlist 4 5 6))
+(start append!-machine)
+(display "append!-machine: ")
+(display (get-register-contents append!-machine 'val))
+(newline)
+
+
+;(define test (mlist 1 2 3))
+;(mcdr test)
