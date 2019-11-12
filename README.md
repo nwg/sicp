@@ -25,3 +25,4 @@
 * exercise 5.20: [pdf](chapter-5/5.3/ex5.20.pdf)
 * exercise 5.21: [code](https://github.com/nwg/sicp/blob/ex5.21/chapter-5/3/chapter-5.3.rkt) [diff](https://github.com/nwg/sicp/commit/0d294ef99f0e1eed7b20c156a021821dd01523ed#diff-6d82eacee05886a21968e26e12f49c0b)
 * exercise 5.22: [code](https://github.com/nwg/sicp/blob/ex5.22/chapter-5/3/chapter-5.3.rkt) [diff](https://github.com/nwg/sicp/commit/4a4ef95538fa921fb21882cfc1af362e644cf8c2)
+* exercise 5.23: [code](https://github.com/nwg/sicp/blob/ex5.23/chapter-5/4/chapter-5.4.rkt) [diff](https://github.com/nwg/sicp/commit/b62c34f91cf81883f771d9dbb0e1ecac7f3e454b#diff-b606f17fa56d029d5bfc7d0e5d1d0cb6)
