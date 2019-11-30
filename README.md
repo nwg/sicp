@@ -32,3 +32,4 @@
 * exercise 5.27: [explanation](https://github.com/nwg/sicp/blob/ex5.27/chapter-5/4/ex5.27.md)
 * exercise 5.28: [code](https://github.com/nwg/sicp/blob/ex5.28/chapter-5/4/chapter-5.4.rkt) [explanation](https://github.com/nwg/sicp/blob/ex5.28/chapter-5/4/ex5.28.md)
 * exercise 5.29: [explanation](https://github.com/nwg/sicp/blob/ex5.29/chapter-5/4/ex5.29.md)
+* exercise 5.30: skipping for now
