@@ -4,7 +4,7 @@
        - S(n) = S(n-2) + S(n-1) + 40
     1. S(n) = 56*fib(n+1) - 40
 
-# Proof of part 2.ii
+Proof of part 2.ii
 ```
 S(0) = 16
 S(1) = 16
