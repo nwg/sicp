@@ -168,6 +168,7 @@
 (define (last-exp? seq) (null? (cdr seq)))
 (define (first-exp seq) (car seq))
 (define (rest-exps seq) (cdr seq))
+(define (no-more-exps? seq) (null? seq))
 
 (define (sequence->exp seq)
   (cond ((null? seq) seq)
@@ -346,6 +347,7 @@
         (list 'extend-environment extend-environment)
         (list 'procedure-body procedure-body)
         (list 'begin-actions begin-actions)
+        (list 'no-more-exps? no-more-exps?)
         (list 'first-exp first-exp)
         (list 'last-exp? last-exp?)
         (list 'rest-exps rest-exps)
@@ -556,9 +558,9 @@
        (goto (label ev-sequence))
 
      ev-sequence
+       (test (op no-more-exps?) (reg unev))
+       (branch (label ev-sequence-end))
        (assign exp (op first-exp) (reg unev))
-       (test (op last-exp?) (reg unev))
-       (branch (label ev-sequence-last-exp))
        (save unev)
        (save env)
        (assign continue
@@ -567,13 +569,11 @@
      ev-sequence-continue
        (restore env)
        (restore unev)
-       (assign unev
-               (op rest-exps)
-               (reg unev))
+       (assign unev (op rest-exps) (reg unev))
        (goto (label ev-sequence))
-     ev-sequence-last-exp
+     ev-sequence-end
        (restore continue)
-       (goto (label eval-dispatch))
+       (goto (reg continue))
 
      ev-if
        (save exp)   ; save expression for later
