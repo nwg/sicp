@@ -35,7 +35,12 @@
   (list (list 'car car)
         (list 'cdr cdr)
         (list 'cons cons)
-        (list 'null? null?)))
+        (list 'null? null?)
+        (list '= =)
+        (list '* *)
+        (list '- -)
+        (list '> >)
+        (list '+ +)))
 
 (define (primitive-procedure-names)
   (map car primitive-procedures))
@@ -300,8 +305,12 @@
 (define (get-global-environment)
   the-global-environment)
 
+(define (print-stack-statistics)
+  (eceval 'print-stack-statistics))
+
 (define eceval-operations
-  (list (list 'self-evaluating? 
+  (list (list 'print-stack-statistics print-stack-statistics)
+        (list 'self-evaluating? 
               self-evaluating?)
         (list 'prompt-for-input prompt-for-input)
         (list 'read read)
@@ -372,6 +381,7 @@
        (assign continue (label print-result))
        (goto (label eval-dispatch))
      print-result
+       (perform (op print-stack-statistics))
        (perform (op announce-output)
                 (const ";;; EC-Eval value:"))
        (perform (op user-print) (reg val))
