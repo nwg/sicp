@@ -2,10 +2,16 @@
 
 (require "../2/base.rkt")
 (require compatibility/mlist)
+(require "../../utility.rkt")
 
 (define (tagged-list? exp tag)
   (if (pair? exp)
       (eq? (car exp) tag)
+      false))
+
+(define (mtagged-list? exp tag)
+  (if (mpair? exp)
+      (eq? (mcar exp) tag)
       false))
 
 (define (enclosing-environment env) (cdr env))
@@ -233,12 +239,12 @@
 
 (define (user-print object)
   (if (compound-procedure? object)
-      (display 
+      (displayln 
        (list 'compound-procedure
              (procedure-parameters object)
              (procedure-body object)
              '<procedure-env>))
-      (display object)))
+      (displayln object)))
 
 (define (lookup-variable-value var env)
   (define (env-loop env)
@@ -293,6 +299,28 @@
                 (frame-values frame)))))
   (env-loop env))
 
+(define (delay-it exp env)
+  (mcons 'thunk (mcons exp (mcons env '()))))
+(define (thunk? obj) (mtagged-list? obj 'thunk))
+(define (thunk-exp thunk) (mcadr thunk))
+(define (thunk-env thunk) (mcaddr thunk))
+
+(define (evaluated-thunk? obj)
+  (mtagged-list? obj 'evaluated-thunk))
+
+(define (thunk-value evaluated-thunk) 
+  (mcadr evaluated-thunk))
+
+(define (set-thunk-evaluated! thunk value)
+  (if (not (thunk? thunk))
+      (error "Not a thunk")
+      (begin
+        (set-mcar! thunk 'evaluated-thunk)
+        ;; replace exp with its value:
+        (set-mcar! (mcdr thunk) value) 
+        ;; forget unneeded env:
+        (set-mcdr! (mcdr thunk) '())
+        'ok))) 
 
 (define the-global-environment
   (setup-environment))
@@ -303,6 +331,13 @@
 (define eceval-operations
   (list (list 'self-evaluating? 
               self-evaluating?)
+        (list 'thunk? thunk?)
+        (list 'evaluated-thunk? evaluated-thunk?)
+        (list 'set-thunk-evaluated! set-thunk-evaluated!)
+        (list 'thunk-exp thunk-exp)
+        (list 'thunk-env thunk-env)
+        (list 'thunk-value thunk-value)
+        (list 'delay-it delay-it)
         (list 'prompt-for-input prompt-for-input)
         (list 'read read)
         (list 'get-global-environment get-global-environment)
@@ -370,7 +405,7 @@
        (assign exp (op read))
        (assign env (op get-global-environment))
        (assign continue (label print-result))
-       (goto (label eval-dispatch))
+       (goto (label actual-value))
      print-result
        (perform (op announce-output)
                 (const ";;; EC-Eval value:"))
@@ -421,10 +456,42 @@
        (branch (label ev-application))
        (goto (label unknown-expression-type))
 
+     actual-value
+       (save continue)
+       (assign continue (label av-after-eval))
+       (goto (label eval-dispatch))
+     av-after-eval
+       (restore continue)
+       (goto (label force-it))
+       
+     force-it
+       (test (op thunk?) (reg val))
+       (branch (label is-thunk))
+       (test (op evaluated-thunk?) (reg val))
+       (branch (label is-evaluated-thunk))
+       (goto (reg continue))
+       
+     is-thunk
+       (assign exp (op thunk-exp) (reg val))
+       (assign env (op thunk-env) (reg val))
+       (save continue)
+       (assign continue (label fi-is-thunk-after-av))
+       (save val)
+       (goto (label actual-value))
+     fi-is-thunk-after-av
+       (restore exp) ; old val
+       (perform (op set-thunk-evaluated!) (reg exp) (reg val))
+       (restore continue)
+       (goto (reg continue))
+
+     is-evaluated-thunk
+       (assign val (op thunk-value) (reg val))
+       (goto (reg continue))
+       
      ev-self-eval
        (assign val (reg exp))
        (goto (reg continue))
-       ev-variable
+     ev-variable
        (assign val
                (op lookup-variable-value)
                (reg exp)
@@ -464,10 +531,54 @@
        (restore env)
        (assign argl (op empty-arglist))
        (assign proc (reg val))    ; the operator
-       (test (op no-operands?) (reg unev))
-       (branch (label apply-dispatch))
-       (save proc)
 
+       (test (op primitive-procedure?) (reg proc))
+       (branch (label ev-appl-primitive))
+       (test (op compound-procedure?) (reg proc))
+       (branch (label ev-appl-compound))
+       (goto (label unknown-procedure-type))
+
+     ev-appl-compound
+     ev-appl-compound-loop
+       (test (op no-operands?) (reg unev))
+       (branch (label compound-apply))
+       (assign exp
+               (op first-operand)
+               (reg unev))
+
+       (assign val (op delay-it) (reg exp) (reg env))
+       (assign argl 
+               (op adjoin-arg)
+               (reg val)
+               (reg argl))
+       (assign unev
+               (op rest-operands)
+               (reg unev))
+       (goto (label ev-appl-compound-loop))
+     compound-apply
+       (assign unev 
+               (op procedure-parameters)
+               (reg proc))
+       (assign env
+               (op procedure-environment)
+               (reg proc))
+       (assign env
+               (op extend-environment)
+               (reg unev)
+               (reg argl)
+               (reg env))
+       (assign unev
+               (op procedure-body)
+               (reg proc))
+       (goto (label ev-sequence))
+
+       
+
+       
+     ev-appl-primitive
+       (test (op no-operands?) (reg unev))
+       (branch (label primitive-apply))
+       (save proc)
      ev-appl-operand-loop
        (save argl)
        (assign exp
@@ -479,7 +590,7 @@
        (save unev)
        (assign continue 
                (label ev-appl-accumulate-arg))
-       (goto (label eval-dispatch))
+       (goto (label actual-value))
 
      ev-appl-accumulate-arg
        (restore unev)
@@ -497,7 +608,7 @@
      ev-appl-last-arg
        (assign continue 
                (label ev-appl-accum-last-arg))
-       (goto (label eval-dispatch))
+       (goto (label actual-value))
      ev-appl-accum-last-arg
        (restore argl)
        (assign argl 
@@ -505,14 +616,7 @@
                (reg val)
                (reg argl))
        (restore proc)
-       (goto (label apply-dispatch))
-
-     apply-dispatch
-       (test (op primitive-procedure?) (reg proc))
-       (branch (label primitive-apply))
-       (test (op compound-procedure?) (reg proc))
-       (branch (label compound-apply))
-       (goto (label unknown-procedure-type))
+       (goto (label primitive-apply))
 
      primitive-apply
        (assign val (op apply-primitive-procedure)
@@ -520,23 +624,6 @@
                (reg argl))
        (restore continue)
        (goto (reg continue))
-
-     compound-apply
-       (assign unev 
-               (op procedure-parameters)
-               (reg proc))
-       (assign env
-               (op procedure-environment)
-               (reg proc))
-       (assign env
-               (op extend-environment)
-               (reg unev)
-               (reg argl)
-               (reg env))
-       (assign unev
-               (op procedure-body)
-               (reg proc))
-       (goto (label ev-sequence))
 
      ev-begin
        (assign unev
@@ -572,7 +659,7 @@
        (assign continue (label ev-if-decide))
        (assign exp (op if-predicate) (reg exp))
        ; evaluate the predicate:
-       (goto (label eval-dispatch))
+       (goto (label actual-value))
 
      ev-if-decide
        (restore continue)
@@ -651,4 +738,5 @@
        )))
 
 
+;(eceval 'trace-on)
 (start eceval)
