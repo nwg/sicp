@@ -590,6 +590,7 @@
    (append (statements seq1)
            (statements seq2))))
 
+
 (compile
  '(define (factorial n)
     (if (= n 1)
@@ -600,8 +601,11 @@
 
 (compile
  '(define (factorial n)
-    (if (= n 1)
-        1
-        (* (factorial (- n 1)) n)))
+    (define (iter product counter)
+      (if (> counter n)
+          product
+          (iter (* counter product)
+                (+ counter 1))))
+    (iter 1 1))
  'val
  'next)
