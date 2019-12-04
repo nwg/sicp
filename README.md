@@ -35,3 +35,4 @@
 * exercise 5.30: skipping for now
 * exercise 5.31: [explanation](https://github.com/nwg/sicp/blob/ex5.31/chapter-5/5/ex5.31.md)
 * exercise 5.32: [explanation](https://github.com/nwg/sicp/blob/ex5.32/chapter-5/5/ex5.32.md) [code](https://github.com/nwg/sicp/blob/ex5.32/chapter-5/4/chapter-5.4.rkt) [diff](https://github.com/nwg/sicp/commit/454a5d99657e084351e82f7cae70e6fe249225e4#diff-b606f17fa56d029d5bfc7d0e5d1d0cb6)
+* exercise 5.33: [explanation](https://github.com/nwg/sicp/blob/ex5.33/chapter-5/5/ex5.33.md) [code](https://github.com/nwg/sicp/blob/ex5.33/chapter-5/5/compiler.rkt) [diff](https://github.com/nwg/sicp/commit/a76e1c2a1812c138517e4f09ae2387591514a90b#diff-1520bc4ef2b0995ca0ae523d35f5626d)
