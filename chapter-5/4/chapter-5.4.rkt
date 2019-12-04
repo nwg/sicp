@@ -216,6 +216,7 @@
 (define (make-begin seq) (cons 'begin seq))
 
 (define (application? exp) (pair? exp))
+(define (application-simple? exp) (and (pair? exp) (symbol? (car exp))))
 (define (operator exp) (car exp))
 (define (operands exp) (cdr exp))
 (define (no-operands? ops) (null? ops))
@@ -326,6 +327,7 @@
         (list 'lambda? lambda?)
         (list 'begin? begin?)
         (list 'application? application?)
+        (list 'application-simple? application-simple?)
         (list 'lookup-variable-value lookup-variable-value)
         (list 'text-of-quotation text-of-quotation)
         (list 'lambda-parameters lambda-parameters)
@@ -428,6 +430,8 @@
        (branch (label ev-lambda))
        (test (op begin?) (reg exp))
        (branch (label ev-begin))
+       (test (op application-simple?) (reg exp))
+       (branch (label ev-application-simple))
        (test (op application?) (reg exp))
        (branch (label ev-application))
        (goto (label unknown-expression-type))
@@ -460,6 +464,17 @@
                (reg env))
        (goto (reg continue))
 
+     ev-application-simple
+       ;(perform (op user-print) (const "in simple"))
+       (save continue)
+       (assign unev (op operands) (reg exp))
+       (assign exp (op operator) (reg exp))
+       (assign continue (label ev-appl-simple-did-operator))
+       (goto (label eval-dispatch))
+     ev-appl-simple-did-operator
+       (assign proc (reg val))
+       (goto (label ev-appl-operands))
+       
      ev-application
        (save continue)
        (save env)
@@ -473,8 +488,9 @@
      ev-appl-did-operator
        (restore unev)             ; the operands
        (restore env)
-       (assign argl (op empty-arglist))
        (assign proc (reg val))    ; the operator
+     ev-appl-operands
+       (assign argl (op empty-arglist))
        (test (op no-operands?) (reg unev))
        (branch (label apply-dispatch))
        (save proc)
