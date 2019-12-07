@@ -367,7 +367,7 @@
 
 (define (construct-arglist operand-codes)
   (let ((operand-codes 
-         (reverse operand-codes)))
+         operand-codes))
     (if (null? operand-codes)
         (make-instruction-sequence 
          '() 
@@ -403,7 +403,12 @@
                      (reg val)
                      (reg argl)))))))
     (if (null? (cdr operand-codes))
-        code-for-next-arg
+        (append-instruction-sequences
+         code-for-next-arg
+         (make-instruction-sequence
+          '(argl)
+          '(argl)
+          '((assign argl (op reverse) (reg argl)))))
         (preserving 
          '(env)
          code-for-next-arg
@@ -592,20 +597,7 @@
 
 
 (compile
- '(define (factorial n)
-    (if (= n 1)
-        1
-        (* n (factorial (- n 1)))))
- 'val
- 'next)
-
-(compile
- '(define (factorial n)
-    (define (iter product counter)
-      (if (> counter n)
-          product
-          (iter (* counter product)
-                (+ counter 1))))
-    (iter 1 1))
+ '(define (test x y)
+    (+ x y))
  'val
  'next)
