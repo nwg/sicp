@@ -547,14 +547,28 @@
                                 s2)))))
 
 (define (preserving regs seq1 seq2)
+  (display "Preserving ")
+  (display regs)
+  (display " and appending ")
+  (display seq1)
+  (display " and ")
+  (display seq2)
+  (newline)
+  (preserving-internal regs seq1 seq2))
+
+
+(define (preserving-internal regs seq1 seq2)
+  (define always-preserve false)
   (if (null? regs)
       (append-instruction-sequences seq1 seq2)
       (let ((first-reg (car regs)))
-        (if (and 
-             (needs-register? seq2 first-reg)
-             (modifies-register? seq1 
-                                 first-reg))
-            (preserving 
+        (if (or always-preserve
+                (and
+                 (needs-register? seq2 first-reg)
+                 (modifies-register? seq1 
+                                     first-reg)))
+
+            (preserving-internal 
              (cdr regs)
              (make-instruction-sequence
               (list-union 
@@ -567,7 +581,7 @@
                       (statements seq1)
                       `((restore ,first-reg))))
              seq2)
-            (preserving 
+            (preserving-internal 
              (cdr regs)
              seq1
              seq2)))))
@@ -591,21 +605,13 @@
            (statements seq2))))
 
 
-(compile
- '(define (factorial n)
-    (if (= n 1)
-        1
-        (* n (factorial (- n 1)))))
- 'val
- 'next)
+
+;; (compile
+;;  '(define (f x y) (+ x y))
+;;  'val
+;;  'next)
 
 (compile
- '(define (factorial n)
-    (define (iter product counter)
-      (if (> counter n)
-          product
-          (iter (* counter product)
-                (+ counter 1))))
-    (iter 1 1))
+ '(define x 2)
  'val
  'next)
