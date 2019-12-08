@@ -39,3 +39,4 @@
 * exercise 5.34: [explanation](https://github.com/nwg/sicp/blob/ex5.34/chapter-5/5/ex5.34.md)
 * exercise 5.35: [explanation](https://github.com/nwg/sicp/blob/ex5.35/chapter-5/5/ex5.35.md)
 * exercise 5.36: [explanation](https://github.com/nwg/sicp/blob/ex5.36/chapter-5/5/ex5.36.md) [diff](https://github.com/nwg/sicp/commit/fca6f84f5a32b35fb068dc2dfb02b9208c4e00c6#diff-1520bc4ef2b0995ca0ae523d35f5626d) [code](https://github.com/nwg/sicp/blob/ex5.36/chapter-5/5/compiler.rkt)
+* exercise 5.37: [explanation](https://github.com/nwg/sicp/blob/ex5.37/chapter-5/5/ex5.37.md)
