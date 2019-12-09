@@ -5,7 +5,7 @@
       (eq? (car exp) tag)
       false))
 
-(define all-regs '(env proc val argl continue))
+(define all-regs '(env proc val argl continue arg1 arg2))
 
 (define label-counter 0)
 
@@ -129,6 +129,16 @@
 (define (first-operand ops) (car ops))
 (define (rest-operands ops) (cdr ops))
 
+(define (open-coded-operator exp)
+  (car exp))
+
+(define (open-coded? exp)
+  (or
+   (tagged-list? exp '=)
+   (tagged-list? exp '+)
+   (tagged-list? exp '*)
+   (tagged-list? exp '-)))
+
 (define (compile exp target linkage)
   (cond ((self-evaluating? exp)
          (compile-self-evaluating 
@@ -154,6 +164,8 @@
         ((cond? exp) 
          (compile 
           (cond->if exp) target linkage))
+        ((open-coded? exp)
+         (compile-open-coded (open-coded-operator exp) exp target linkage))
         ((application? exp)
          (compile-application 
           exp target linkage))
@@ -183,7 +195,8 @@
 
 (define (end-with-linkage 
          linkage instruction-sequence)
-  (preserving '(continue)
+  (preserving
+   '(continue)
    instruction-sequence
    (compile-linkage linkage)))
 
@@ -347,6 +360,28 @@
                        'val
                        'return))))
 
+(define (spread-arguments operands next-code)
+  (let* ([arg1-compiled (compile (car operands) 'arg1 'next)]
+         [arg2-compiled (compile (cadr operands) 'arg2 'next)])
+    (preserving
+     '(env continue)
+     arg1-compiled
+     (preserving
+      '(arg1 env continue)
+      arg2-compiled
+      next-code))))
+
+(define (compile-open-coded op exp target linkage)
+  (end-with-linkage
+   linkage
+   (spread-arguments
+    (operands exp)
+    (make-instruction-sequence
+     '(arg1 arg2)
+     (list target)
+     `((assign ,target (op ,op) (reg arg1) (reg arg2)))))))
+    
+    
 (define (compile-application 
          exp target linkage)
   (let ((proc-code 
@@ -591,21 +626,15 @@
            (statements seq2))))
 
 
-(compile
- '(define (factorial n)
-    (if (= n 1)
-        1
-        (* n (factorial (- n 1)))))
- 'val
- 'next)
+;; (compile
+;;  '(define x (+ (+ 3 4) (+ 1 2)))
+;;  'val
+;;  'next)
 
 (compile
- '(define (factorial n)
-    (define (iter product counter)
-      (if (> counter n)
-          product
-          (iter (* counter product)
-                (+ counter 1))))
-    (iter 1 1))
+ '(define (factorial-alt n)
+    (if (= n 1)
+        1
+        (* n (factorial-alt (- n 1)))))
  'val
  'next)
