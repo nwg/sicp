@@ -38,6 +38,14 @@
          [values (frame-values frame)])
     (mlist-ref values var-pos)))
 
+(define (lexical-address-set! address val env)
+  (let* ([env-pos (car address)]
+         [var-pos (cadr address)]
+         [frame (list-ref env env-pos)]
+         [values (frame-values frame)]
+         [back (mlist-tail values var-pos)])
+    (set-mcar! back val)))
+
 (define primitive-procedures
   (list (list 'car car)
         (list 'cdr cdr)
@@ -692,3 +700,12 @@
        [frame2 (extend-environment '(z w) '(4 5) frame1)])
   (displayln (lexical-address-lookup '(1 1) frame2))
   (displayln (lexical-address-lookup '(0 0) frame2)))
+
+(let* ([env1 (extend-environment
+              '(x y) '(1 2) the-empty-environment)]
+       [env2 (extend-environment
+              '(z w) '(3 4) env1)])
+  (lexical-address-set! '(1 1) 9 env2)
+  (lexical-address-set! '(1 0) 10 env2)
+  (displayln (lexical-address-lookup '(1 1) env2))
+  (displayln (lexical-address-lookup '(1 0) env2)))
