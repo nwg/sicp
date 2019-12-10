@@ -87,3 +87,4 @@
    (perform (op define-variable!) (const factorial-alt) (reg val) (reg env))         (perform (op define-variable!) (const factorial-alt) (reg val) (reg env))
    (assign val (const ok))                                                           (assign val (const ok))
    ```
+4. see [code](https://github.com/nwg/sicp/blob/ex5.38/chapter-5/5/compiler.rkt) and [diff](https://github.com/nwg/sicp/commit/c8ded4aa4d06fa695bfed2a240094bc4a0c0a93f#diff-1520bc4ef2b0995ca0ae523d35f5626d)

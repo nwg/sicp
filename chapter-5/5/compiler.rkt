@@ -360,27 +360,30 @@
                        'val
                        'return))))
 
-(define (spread-arguments operands next-code)
-  (let* ([arg1-compiled (compile (car operands) 'arg1 'next)]
-         [arg2-compiled (compile (cadr operands) 'arg2 'next)])
-    (preserving
-     '(env continue)
-     arg1-compiled
-     (preserving
-      '(arg1 env continue)
-      arg2-compiled
-      next-code))))
+(define (open-coded-rest-ops op operands target)
+  (if (null? operands)
+      (empty-instruction-sequence)
+      (let ([dest (if (null? (cdr operands))
+                      target
+                      'arg1)])
+        (preserving
+         '(arg1 env)
+         (compile (car operands) 'arg2 'next)
+         (append-instruction-sequences          
+          (make-instruction-sequence
+           '(arg1 arg2)
+           (list dest)
+           `((assign ,target (op ,op) (reg arg1) (reg arg2))))
+          (open-coded-rest-ops op (cdr operands) target))))))
 
 (define (compile-open-coded op exp target linkage)
-  (end-with-linkage
-   linkage
-   (spread-arguments
-    (operands exp)
-    (make-instruction-sequence
-     '(arg1 arg2)
-     (list target)
-     `((assign ,target (op ,op) (reg arg1) (reg arg2)))))))
-    
+  (let* ([operandss (operands exp)]
+         [arg1-compiled (compile (car operandss) 'arg1 'next)])
+    (end-with-linkage
+     linkage
+     (append-instruction-sequences
+      arg1-compiled
+      (open-coded-rest-ops op (cdr operandss) target)))))    
     
 (define (compile-application 
          exp target linkage)
@@ -626,15 +629,15 @@
            (statements seq2))))
 
 
-;; (compile
-;;  '(define x (+ (+ 3 4) (+ 1 2)))
-;;  'val
-;;  'next)
-
 (compile
- '(define (factorial-alt n)
-    (if (= n 1)
-        1
-        (* n (factorial-alt (- n 1)))))
+ '(define x (+ (+ 3 4 5) (+ 1 2)))
  'val
  'next)
+
+;; (compile
+;;  '(define (factorial-alt n)
+;;     (if (= n 1)
+;;         1
+;;         (* n (factorial-alt (- n 1)))))
+;;  'val
+;;  'next)
