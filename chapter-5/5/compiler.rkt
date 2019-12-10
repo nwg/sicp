@@ -13,6 +13,16 @@
 (define (extend-compile-environment vars env) (cons vars env))
 (define (enclosing-compile-environment env) (cdr env))
 
+(define (find-variable var env)
+  (define (find-variable-internal env-pos var env)
+    (if (eq? env the-empty-compile-environment)
+        'not-found
+        (let ([var-pos (index-of (car env) var)])
+          (if var-pos
+              (list env-pos var-pos)
+              (find-variable-internal (+ env-pos 1) var (cdr env))))))
+  (find-variable-internal 0 var env))
+
 (define (new-label-number)
   (set! label-counter (+ 1 label-counter))
   label-counter)
@@ -603,11 +613,20 @@
            (statements seq2))))
 
 
-(compile
- '(define (factorial n)
-    (if (= n 1)
-        1
-        (* (factorial (- n 1)) n)))
- 'val
- 'next
- the-empty-compile-environment)
+;; (compile
+;;  '(define (factorial n)
+;;     (if (= n 1)
+;;         1
+;;         (* (factorial (- n 1)) n)))
+;;  'val
+;;  'next
+;;  the-empty-compile-environment)
+
+(find-variable 
+ 'c '((y z) (a b c d e) (x y)))
+
+(find-variable 
+ 'x '((y z) (a b c d e) (x y)))
+
+(find-variable 
+ 'w '((y z) (a b c d e) (x y)))
