@@ -9,6 +9,10 @@
 
 (define label-counter 0)
 
+(define the-empty-compile-environment '())
+(define (extend-compile-environment vars env) (cons vars env))
+(define (enclosing-compile-environment env) (cdr env))
+
 (define (new-label-number)
   (set! label-counter (+ 1 label-counter))
   label-counter)
@@ -129,7 +133,7 @@
 (define (first-operand ops) (car ops))
 (define (rest-operands ops) (cdr ops))
 
-(define (compile exp target linkage)
+(define (compile exp target linkage env)
   (cond ((self-evaluating? exp)
          (compile-self-evaluating 
           exp target linkage))
@@ -137,26 +141,26 @@
          (compile-quoted exp target linkage))
         ((variable? exp)
          (compile-variable 
-          exp target linkage))
+          exp target linkage env))
         ((assignment? exp)
          (compile-assignment
-          exp target linkage))
+          exp target linkage env))
         ((definition? exp)
          (compile-definition
-          exp target linkage))
+          exp target linkage env))
         ((if? exp)
-         (compile-if exp target linkage))
+         (compile-if exp target linkage env))
         ((lambda? exp)
-         (compile-lambda exp target linkage))
+         (compile-lambda exp target linkage env))
         ((begin? exp)
          (compile-sequence 
-          (begin-actions exp) target linkage))
+          (begin-actions exp) target linkage env))
         ((cond? exp) 
          (compile 
-          (cond->if exp) target linkage))
+          (cond->if exp) target linkage env))
         ((application? exp)
          (compile-application 
-          exp target linkage))
+          exp target linkage env))
         (else
          (error "Unknown expression type: 
                  COMPILE" 
@@ -206,7 +210,7 @@
        (const ,(text-of-quotation exp)))))))
 
 (define (compile-variable
-         exp target linkage)
+         exp target linkage env)
   (end-with-linkage 
    linkage
    (make-instruction-sequence 
@@ -218,12 +222,13 @@
               (reg env))))))
 
 (define (compile-assignment 
-         exp target linkage)
+         exp target linkage env)
   (let ((var (assignment-variable exp))
         (get-value-code
          (compile (assignment-value exp) 
                   'val
-                  'next)))
+                  'next
+                  env)))
     (end-with-linkage 
      linkage
      (preserving 
@@ -239,12 +244,13 @@
          (assign ,target (const ok))))))))
 
 (define (compile-definition 
-         exp target linkage)
+         exp target linkage env)
   (let ((var (definition-variable exp))
         (get-value-code
          (compile (definition-value exp)
                   'val
-                  'next)))
+                  'next
+                  env)))
     (end-with-linkage
      linkage
      (preserving 
@@ -259,7 +265,7 @@
                   (reg env))
          (assign ,target (const ok))))))))
 
-(define (compile-if exp target linkage)
+(define (compile-if exp target linkage env)
   (let ((t-branch (make-label 'true-branch))
         (f-branch (make-label 'false-branch))
         (after-if (make-label 'after-if)))
@@ -270,15 +276,18 @@
       (let ((p-code 
              (compile (if-predicate exp)
                       'val
-                      'next))
+                      'next
+                      env))
             (c-code
              (compile (if-consequent exp) 
                       target 
-                      consequent-linkage))
+                      consequent-linkage
+                      env))
             (a-code
              (compile (if-alternative exp)
                       target
-                      linkage)))
+                      linkage
+                      env)))
         (preserving 
          '(env continue)
          p-code
@@ -295,16 +304,17 @@
             f-branch a-code))
           after-if))))))
 
-(define (compile-sequence seq target linkage)
+(define (compile-sequence seq target linkage env)
   (if (last-exp? seq)
-      (compile (first-exp seq) target linkage)
+      (compile (first-exp seq) target linkage env)
       (preserving '(env continue)
-       (compile (first-exp seq) target 'next)
+       (compile (first-exp seq) target 'next env)
        (compile-sequence (rest-exps seq)
                          target
-                         linkage))))
+                         linkage
+                         env))))
 
-(define (compile-lambda exp target linkage)
+(define (compile-lambda exp target linkage environment)
   (let ((proc-entry 
          (make-label 'entry))
         (after-lambda 
@@ -325,11 +335,12 @@
              (op make-compiled-procedure)
              (label ,proc-entry)
              (reg env)))))
-        (compile-lambda-body exp proc-entry))
+        (compile-lambda-body exp proc-entry environment))
        after-lambda))))
 
-(define (compile-lambda-body exp proc-entry)
-  (let ((formals (lambda-parameters exp)))
+(define (compile-lambda-body exp proc-entry environment)
+  (let* ((formals (lambda-parameters exp))
+         (extended-compile-env (extend-compile-environment formals environment)))
     (append-instruction-sequences
      (make-instruction-sequence 
       '(env proc argl)
@@ -345,15 +356,16 @@
                 (reg env))))
      (compile-sequence (lambda-body exp)
                        'val
-                       'return))))
+                       'return
+                       environment))))
 
 (define (compile-application 
-         exp target linkage)
+         exp target linkage env)
   (let ((proc-code 
-         (compile (operator exp) 'proc 'next))
+         (compile (operator exp) 'proc 'next env))
         (operand-codes
          (map (lambda (operand)
-                (compile operand 'val 'next))
+                (compile operand 'val 'next env))
               (operands exp))))
     (preserving 
      '(env continue)
@@ -591,3 +603,11 @@
            (statements seq2))))
 
 
+(compile
+ '(define (factorial n)
+    (if (= n 1)
+        1
+        (* (factorial (- n 1)) n)))
+ 'val
+ 'next
+ the-empty-compile-environment)
