@@ -31,6 +31,13 @@
                  vars 
                  vals))))
 
+(define (lexical-address-lookup address env)
+  (let* ([env-pos (car address)]
+         [var-pos (cadr address)]
+         [frame (list-ref env env-pos)]
+         [values (frame-values frame)])
+    (mlist-ref values var-pos)))
+
 (define primitive-procedures
   (list (list 'car car)
         (list 'cdr cdr)
@@ -681,3 +688,7 @@
 ;(start eceval)
 
 
+(let* ([frame1 (extend-environment '(x y) '(2 3) the-empty-environment)]
+       [frame2 (extend-environment '(z w) '(4 5) frame1)])
+  (displayln (lexical-address-lookup '(1 1) frame2))
+  (displayln (lexical-address-lookup '(0 0) frame2)))
