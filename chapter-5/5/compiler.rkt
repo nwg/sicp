@@ -221,15 +221,25 @@
 
 (define (compile-variable
          exp target linkage env)
-  (end-with-linkage 
-   linkage
-   (make-instruction-sequence 
-    '(env)
-    (list target)
-    `((assign ,target
-              (op lookup-variable-value)
-              (const ,exp)
-              (reg env))))))
+  (let ([var-address (find-variable exp env)])
+    (end-with-linkage 
+     linkage
+     (if (eq? var-address 'not-found)
+         (make-instruction-sequence
+          '()
+          `(,target env)
+          `((assign env (op get-global-environment))
+            (assign ,target
+                    (op lookup-variable-value)
+                    (const ,exp)
+                    (reg env))))
+         (make-instruction-sequence 
+          '(env)
+          (list target)
+          `((assign ,target
+                    (op lexical-address-lookup)
+                    (const ,var-address)
+                    (reg env))))))))
 
 (define (compile-assignment 
          exp target linkage env)
@@ -239,19 +249,29 @@
                   'val
                   'next
                   env)))
-    (end-with-linkage 
-     linkage
-     (preserving 
-      '(env)
-      get-value-code
-      (make-instruction-sequence
-       '(env val)
-       (list target)
-       `((perform (op set-variable-value!)
-                  (const ,var)
-                  (reg val)
-                  (reg env))
-         (assign ,target (const ok))))))))
+    (let ([var-address (find-variable var env)])
+      (end-with-linkage 
+       linkage
+       (preserving 
+        '(env)
+        get-value-code
+        (if (eq? var-address 'not-found)
+            (make-instruction-sequence
+             '(val)
+             `(,target env)
+             `((assign env (op get-global-environment))
+               (perform (op set-variable-value!)
+                        (const ,var)
+                        (reg val)
+                        (reg env))))
+            (make-instruction-sequence
+             '(env val)
+             (list target)
+             `((perform (op lexical-address-set!)
+                        (const ,var-address)
+                        (reg val)
+                        (reg env))
+               (assign ,target (const ok))))))))))
 
 (define (compile-definition 
          exp target linkage env)
@@ -367,7 +387,7 @@
      (compile-sequence (lambda-body exp)
                        'val
                        'return
-                       environment))))
+                       extended-compile-env))))
 
 (define (compile-application 
          exp target linkage env)
@@ -613,20 +633,15 @@
            (statements seq2))))
 
 
-;; (compile
-;;  '(define (factorial n)
-;;     (if (= n 1)
-;;         1
-;;         (* (factorial (- n 1)) n)))
-;;  'val
-;;  'next
-;;  the-empty-compile-environment)
+(compile
+ '(define (f x y)
+    (define (g z w)
+      (set! x 2)
+      (set! w y)
+      (set! w q)
+      (set! q 2)
+      ))
+ 'val
+ 'next
+ the-empty-compile-environment)
 
-(find-variable 
- 'c '((y z) (a b c d e) (x y)))
-
-(find-variable 
- 'x '((y z) (a b c d e) (x y)))
-
-(find-variable 
- 'w '((y z) (a b c d e) (x y)))
