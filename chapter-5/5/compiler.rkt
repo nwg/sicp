@@ -36,6 +36,7 @@
 (define (self-evaluating? exp)
   (cond ((number? exp) true)
         ((string? exp) true)
+        ((eq? exp '*unassigned*) true)
         (else false)))
 
 (define (variable? exp) (symbol? exp))
@@ -53,6 +54,9 @@
   (cadr exp))
 
 (define (assignment-value exp) (caddr exp))
+
+(define (make-assignment var value)
+  (list 'set! var value))
 
 (define (definition? exp)
   (tagged-list? exp 'define))
@@ -143,6 +147,44 @@
 (define (first-operand ops) (car ops))
 (define (rest-operands ops) (cdr ops))
 
+(define (let? exp)
+  (tagged-list? exp 'let))
+
+(define (let-definitions exp)
+  (cadr exp))
+
+(define (let-actions exp)
+  (cddr exp))
+
+(define (make-let vars values actions)
+  (let ([definitions (map list vars values)])
+    (cons 'let (cons definitions actions))))
+
+(define (let->combination exp)
+  (let* ([definitions (let-definitions exp)]
+         [vars (map car definitions)]
+         [initials (map cadr definitions)]
+         [body (let-actions exp)])
+    (cons (make-lambda vars body) initials)))
+
+(define (scan-out-defines body)
+  (let-values ([(defines rest) (splitf-at body definition?)])
+    (if (null? defines)
+        rest
+        (if (findf definition? rest)
+            (error "Definitions must come first in body")
+            (let* ([vars (map definition-variable defines)]
+                   [values (map definition-value defines)]
+                   [let-vals (make-list (length vars) '*unassigned*)]
+                   [sets (map (lambda (var value) (make-assignment var value)) vars values)])
+              (list
+               (make-let
+                vars
+                let-vals
+                (append
+                 sets
+                 rest))))))))
+
 (define (compile exp target linkage env)
   (cond ((self-evaluating? exp)
          (compile-self-evaluating 
@@ -162,6 +204,8 @@
          (compile-if exp target linkage env))
         ((lambda? exp)
          (compile-lambda exp target linkage env))
+        ((let? exp)
+         (compile (let->combination exp) target linkage env))
         ((begin? exp)
          (compile-sequence 
           (begin-actions exp) target linkage env))
@@ -384,7 +428,7 @@
                 (const ,formals)
                 (reg argl)
                 (reg env))))
-     (compile-sequence (lambda-body exp)
+     (compile-sequence (scan-out-defines (lambda-body exp))
                        'val
                        'return
                        extended-compile-env))))
