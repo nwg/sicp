@@ -188,12 +188,14 @@
 (define (open-coded-operator exp)
   (car exp))
 
-(define (open-coded? exp)
-  (or
-   (tagged-list? exp '=)
-   (tagged-list? exp '+)
-   (tagged-list? exp '*)
-   (tagged-list? exp '-)))
+(define (open-coded? exp env)
+  (and
+   (or
+    (tagged-list? exp '=)
+    (tagged-list? exp '+)
+    (tagged-list? exp '*)
+    (tagged-list? exp '-))
+   (eq? (find-variable (car exp) env) 'not-found)))
 
 (define (compile exp target linkage env)
   (cond ((self-evaluating? exp)
@@ -222,7 +224,7 @@
         ((cond? exp) 
          (compile 
           (cond->if exp) target linkage env))
-        ((open-coded? exp)
+        ((open-coded? exp env)
          (compile-open-coded (open-coded-operator exp) exp target linkage env))
         ((application? exp)
          (compile-application 
@@ -715,10 +717,15 @@
            (statements seq2))))
 
 (compile
- '(define (factorial-alt n)
-    (if (= n 1)
-        1
-        (* n (factorial-alt (- n 1)))))
+ '(define (f + * a b x y)
+    (+ (* a x) (* b y)))
+ 'val
+ 'next
+ the-empty-compile-environment)
+
+(compile
+ '(define (f a b x y)
+    (+ (* a x) (* b y)))
  'val
  'next
  the-empty-compile-environment)
