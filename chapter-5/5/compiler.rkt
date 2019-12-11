@@ -5,7 +5,7 @@
       (eq? (car exp) tag)
       false))
 
-(define all-regs '(env proc val argl continue))
+(define all-regs '(env proc val argl continue arg1 arg2))
 
 (define label-counter 0)
 
@@ -185,6 +185,16 @@
                  sets
                  rest))))))))
 
+(define (open-coded-operator exp)
+  (car exp))
+
+(define (open-coded? exp)
+  (or
+   (tagged-list? exp '=)
+   (tagged-list? exp '+)
+   (tagged-list? exp '*)
+   (tagged-list? exp '-)))
+
 (define (compile exp target linkage env)
   (cond ((self-evaluating? exp)
          (compile-self-evaluating 
@@ -212,6 +222,8 @@
         ((cond? exp) 
          (compile 
           (cond->if exp) target linkage env))
+        ((open-coded? exp)
+         (compile-open-coded (open-coded-operator exp) exp target linkage env))
         ((application? exp)
          (compile-application 
           exp target linkage env))
@@ -241,7 +253,8 @@
 
 (define (end-with-linkage 
          linkage instruction-sequence)
-  (preserving '(continue)
+  (preserving
+   '(continue)
    instruction-sequence
    (compile-linkage linkage)))
 
@@ -433,6 +446,31 @@
                        'return
                        extended-compile-env))))
 
+(define (open-coded-rest-ops op operands target env)
+  (if (null? operands)
+      (empty-instruction-sequence)
+      (let ([dest (if (null? (cdr operands))
+                      target
+                      'arg1)])
+        (preserving
+         '(arg1 env)
+         (compile (car operands) 'arg2 'next env)
+         (append-instruction-sequences          
+          (make-instruction-sequence
+           '(arg1 arg2)
+           (list dest)
+           `((assign ,target (op ,op) (reg arg1) (reg arg2))))
+          (open-coded-rest-ops op (cdr operands) target env))))))
+
+(define (compile-open-coded op exp target linkage env)
+  (let* ([operandss (operands exp)]
+         [arg1-compiled (compile (car operandss) 'arg1 'next env)])
+    (end-with-linkage
+     linkage
+     (append-instruction-sequences
+      arg1-compiled
+      (open-coded-rest-ops op (cdr operandss) target env)))))    
+    
 (define (compile-application 
          exp target linkage env)
   (let ((proc-code 
@@ -676,16 +714,11 @@
    (append (statements seq1)
            (statements seq2))))
 
-
 (compile
- '(define (f x y)
-    (define (g z w)
-      (set! x 2)
-      (set! w y)
-      (set! w q)
-      (set! q 2)
-      ))
+ '(define (factorial-alt n)
+    (if (= n 1)
+        1
+        (* n (factorial-alt (- n 1)))))
  'val
  'next
  the-empty-compile-environment)
-
