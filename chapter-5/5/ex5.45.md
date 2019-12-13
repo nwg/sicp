@@ -15,7 +15,7 @@
    as well as the special-purpose machine for this case.
 2. For the number of pushes, the open-coding compiler already does as well as the special-purpose machine
    For the max-depth, an extra save/restore exists while looking up the 'factorial' name in the global environment.
-   If we didn't allow redefinition of names then the compiler could compiler could scan all names and their
+   If we didn't allow redefinition of names then the compiler could scan all names and their
    entry points, not allow redefinition of names and simply directly assign the entry point to val without an env lookup.
    Then, in the case of the open-coding compiler, env would not need to be preserved around the global env lookup.
 
