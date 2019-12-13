@@ -8,6 +8,12 @@
 (provide mcddr)
 (provide mcaddr)
 (provide mcdddr)
+(provide tagged-list?)
+
+(define (tagged-list? exp tag)
+  (if (pair? exp)
+      (eq? (car exp) tag)
+      false))
 
 (define rm-dupes (compose set->list list->set))
 

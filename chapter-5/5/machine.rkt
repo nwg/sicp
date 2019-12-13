@@ -7,6 +7,7 @@
 (provide get-register-contents)
 (provide start)
 (provide assemble)
+(require (only-in "interpreter.rkt" compiled-procedure?))
 
 (define (make-machine ops 
                       controller-text)

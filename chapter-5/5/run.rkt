@@ -1,8 +1,9 @@
 #lang racket
 
-(require "interpreter.rkt")
+(require "eceval.rkt")
 (require "machine.rkt")
 (require "compiler.rkt")
+(require (only-in "interpreter.rkt" setup-environment))
 
 (define the-global-environment
   (setup-environment))
@@ -24,6 +25,8 @@
     (set-register-contents! 
      eceval 'flag true)
     (start eceval)))
+
+;;(extract-pkg-dependencies (get-info (list "run.rkt")))
 
 (compile-and-go
  '(define (factorial n)
