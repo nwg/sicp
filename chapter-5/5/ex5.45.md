@@ -5,11 +5,11 @@
 | Compiled (w/ open coding) |       3n      | 2(n-2) + 3 for n >= 2 |
 
 1. * Compiled to interpreted:
-     The max-depth ratio is 3n / (5(n-1) + 8) or 3/5 if n is large.
-     The pushes ratio is 2/16
+     * The max-depth ratio 3/5
+     * The pushes ratio is 2/16
    * For Special-purpose to interpreted:
-     max-depth to interpreted is 2/5
-     pushes is 2/16
+     * max-depth is 2/5
+     * pushes is 2/16
 
    Note that pushes for compiled/interpreted and specal-purpose/interpreted are both 2/16, so the open-coding compiler does
    as well as the special-purpose machine for this case.
