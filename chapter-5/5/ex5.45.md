@@ -19,6 +19,8 @@
    entry points, not allow redefinition of names and simply directly assign the entry point to val without an env lookup.
    Then, in the case of the open-coding compiler, env would not need to be preserved around the global env lookup.
 
+   So, in the code:
+
    ```lisp
    (save env)
    (assign env (op get-global-environment))
@@ -28,6 +30,6 @@
 
    would become
    ```lisp
-   (assign proc (const <compiled-entry-point-of-factorial>))
+   (assign proc (label <compiled-entry-point-of-factorial>))
    ```
 
