@@ -11,6 +11,16 @@
 
 (define rm-dupes (compose set->list list->set))
 
+(define (get-type x)
+  (cond ((number? x) 'number)
+        ((pair? x) 'pair)
+        ((string? x) 'string)
+        ((list? x) 'list)
+        ((mpair? x) 'mpair)
+        ((null? x) 'null)
+        ((symbol? x) 'symbol)
+        (else 'other)))
+
 (define (groupby keyfunc items)
   (define (reduce item grouped)
     (let-values ([(front back)

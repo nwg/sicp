@@ -6,6 +6,7 @@
 (provide set-register-contents!)
 (provide get-register-contents)
 (provide start)
+(provide assemble)
 
 (define (make-machine ops 
                       controller-text)
@@ -25,13 +26,18 @@
                (define (print-reg-val val)
                  (if (pair? val)
                      (if (mpair? (car val))
-                         (if (instruction-labels (car val))
+                         (if (not (null? (instruction-labels (car val))))
                              (display (string-join (map ~s (instruction-labels (car val))) "/"))
+                             ;(display "thing")
                              (begin
                                (display (instruction-text (car val)))
                                (display "...")))
-                         (display val))
-                     (display val)))
+                         (if (tagged-list? val 'compiled-procedure)
+                             (display "compiled-procedure")
+                             (display val)))
+                     (if (mpair? val)
+                         (displayln "mpair")
+                         (display val))))
                (when trace-enabled
                  (display "reg ")
                  (display name)
@@ -643,10 +649,8 @@
              operations))
         (aprocs
          (map (lambda (e)
-                (if (label-exp? e)
-                    (error "Operation cannot operate on label expression")
-                    (make-primitive-exp 
-                     e machine labels)))
+                (make-primitive-exp 
+                 e machine labels))
               (operation-exp-operands exp))))
     (lambda () (apply op (map (lambda (p) (p))
                               aprocs)))))

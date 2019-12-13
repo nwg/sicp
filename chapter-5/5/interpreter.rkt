@@ -2,6 +2,8 @@
 
 (require "machine.rkt")
 (require compatibility/mlist)
+(provide eceval)
+(provide setup-environment)
 
 (define (tagged-list? exp tag)
   (if (pair? exp)
@@ -328,8 +330,28 @@
 (define (print-stack-statistics)
   (eceval 'print-stack-statistics))
 
+(define (make-compiled-procedure entry env)
+  (list 'compiled-procedure entry env))
+(define (compiled-procedure? proc)
+  (tagged-list? proc 'compiled-procedure))
+(define (compiled-procedure-entry c-proc) 
+  (cadr c-proc))
+(define (compiled-procedure-env c-proc)
+  (caddr c-proc))
+
 (define eceval-operations
-  (list (list 'print-stack-statistics print-stack-statistics)
+  (list (list '= =)
+        (list '* *)
+        (list '+ +)
+        (list '- -)
+        (list 'false? false?)
+        (list 'list list)
+        (list 'make-compiled-procedure make-compiled-procedure)
+        (list 'lexical-address-lookup lexical-address-lookup)
+        (list 'compiled-procedure? compiled-procedure?)
+        (list 'compiled-procedure-entry compiled-procedure-entry)
+        (list 'compiled-procedure-env compiled-procedure-env)
+        (list 'print-stack-statistics print-stack-statistics)
         (list 'self-evaluating? 
               self-evaluating?)
         (list 'prompt-for-input prompt-for-input)
@@ -393,7 +415,9 @@
 (define eceval
   (make-machine
    eceval-operations
-   '(read-eval-print-loop
+   '(  (branch (label external-entry)) 
+     
+     read-eval-print-loop
        (perform (op initialize-stack))
        (perform (op prompt-for-input)
                 (const ";;; EC-Eval input:"))
@@ -454,6 +478,12 @@
        (branch (label ev-application))
        (goto (label unknown-expression-type))
 
+     external-entry
+       (perform (op initialize-stack))
+       (assign env (op get-global-environment))
+       (assign continue (label print-result))
+       (goto (reg val))
+       
      ev-self-eval
        (assign val (reg exp))
        (goto (reg continue))
@@ -557,6 +587,8 @@
        (branch (label primitive-apply))
        (test (op compound-procedure?) (reg proc))
        (branch (label compound-apply))
+       (test (op compiled-procedure?) (reg proc))
+       (branch (label compiled-apply))       
        (goto (label unknown-procedure-type))
 
      primitive-apply
@@ -582,7 +614,14 @@
                (op procedure-body)
                (reg proc))
        (goto (label ev-sequence))
-
+       
+     compiled-apply
+       (restore continue)
+       (assign val
+               (op compiled-procedure-entry)
+               (reg proc))
+       (goto (reg val))
+  
      ev-begin
        (assign unev
                (op begin-actions)
@@ -699,17 +738,17 @@
 ;(start eceval)
 
 
-(let* ([frame1 (extend-environment '(x y) '(2 3) the-empty-environment)]
-       [frame2 (extend-environment '(z w) '(4 5) frame1)])
-  (displayln (lexical-address-lookup '(1 1) frame2))
-  (displayln (lexical-address-lookup '(0 0) frame2)))
+;; (let* ([frame1 (extend-environment '(x y) '(2 3) the-empty-environment)]
+;;        [frame2 (extend-environment '(z w) '(4 5) frame1)])
+;;   (displayln (lexical-address-lookup '(1 1) frame2))
+;;   (displayln (lexical-address-lookup '(0 0) frame2)))
 
-(let* ([env1 (extend-environment
-              '(x y) '(1 2) the-empty-environment)]
-       [env2 (extend-environment
-              '(z w) '(3 4) env1)])
-  (lexical-address-set! '(1 1) 9 env2)
-  (lexical-address-set! '(1 0) '*unassigned* env2)
-  (displayln (lexical-address-lookup '(1 1) env2))
-  (displayln (lexical-address-lookup '(1 0) env2))
-  )
+;; (let* ([env1 (extend-environment
+;;               '(x y) '(1 2) the-empty-environment)]
+;;        [env2 (extend-environment
+;;               '(z w) '(3 4) env1)])
+;;   (lexical-address-set! '(1 1) 9 env2)
+;;   (lexical-address-set! '(1 0) '*unassigned* env2)
+;;   (displayln (lexical-address-lookup '(1 1) env2))
+;;   (displayln (lexical-address-lookup '(1 0) env2))
+;;   )

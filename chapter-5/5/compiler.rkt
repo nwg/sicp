@@ -1,5 +1,9 @@
 #lang racket
 
+(provide compile)
+(provide statements)
+(provide the-empty-compile-environment)
+
 (define (tagged-list? exp tag)
   (if (pair? exp)
       (eq? (car exp) tag)
@@ -469,7 +473,8 @@
          [arg1-compiled (compile (car operandss) 'arg1 'next env)])
     (end-with-linkage
      linkage
-     (append-instruction-sequences
+     (preserving
+      '(env)
       arg1-compiled
       (open-coded-rest-ops op (cdr operandss) target env)))))    
     
@@ -716,16 +721,16 @@
    (append (statements seq1)
            (statements seq2))))
 
-(compile
- '(define (f + * a b x y)
-    (+ (* a x) (* b y)))
- 'val
- 'next
- the-empty-compile-environment)
+;; (compile
+;;  '(define (f + * a b x y)
+;;     (+ (* a x) (* b y)))
+;;  'val
+;;  'next
+;;  the-empty-compile-environment)
 
-(compile
- '(define (f a b x y)
-    (+ (* a x) (* b y)))
- 'val
- 'next
- the-empty-compile-environment)
+;; (compile
+;;  '(define (f a b x y)
+;;     (+ (* a x) (* b y)))
+;;  'val
+;;  'next
+;;  the-empty-compile-environment)
