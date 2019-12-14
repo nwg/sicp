@@ -7,3 +7,11 @@ The ratio over interpreted performancce is computed as r in the below table:
 | Compiled (w/ open coding) |       21 (r=.39)      |  974 (r=.20)  |      31 (r=.40)      | 10852 (r=.20) |      41 (r=.40)      | 120401 (r=.20) |
 
 The special-purpose machine heavily outperforms the compiled program in this case.
+
+The compiled procedure has:
+* pushes: pushes(n-1) + pushes(n-2) + 5, pushes(0) = 6, pushes(1) = 6
+* depth: 2n + 1
+
+The specal-purpose procedure has:
+* pushes: pushes(n-1) + pushes(n-2) + 40, pushes(0) = 16, pushes(1) = 16
+* depth: 5*n + 3
