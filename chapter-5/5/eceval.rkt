@@ -3,13 +3,27 @@
 (require "machine.rkt")
 (require "interpreter.rkt")
 (require "syntax.rkt")
+(require "../../utility.rkt")
+(require "compiler.rkt")
 (provide eceval)
 
 (define (print-stack-statistics)
   (eceval 'print-stack-statistics))
 
+(define (compile-and-run? exp)
+  (tagged-list? exp 'compile-and-run))
+
+(define (compile-and-run-expression exp) (cadadr exp))
+
+(define (interpreter-compile expression)
+  (let-values ([(instructions labels) (assemble (statements (compile expression 'val 'return the-empty-compile-environment)) eceval)])
+    instructions))
+
 (define eceval-operations
-  (list (list 'displayln displayln)
+  (list (list 'compile interpreter-compile)
+        (list 'compile-and-run? compile-and-run?)
+        (list 'compile-and-run-expression compile-and-run-expression)
+        (list 'displayln displayln)
         (list 'display display)
         (list 'cons cons)
         (list '= =)
@@ -84,6 +98,7 @@
         (list 'and->if and->if)
         ))
 
+
 (define eceval
   (make-machine
    eceval-operations
@@ -98,6 +113,7 @@
        (assign env (op get-global-environment))
        (assign continue (label print-result))
        (goto (label eval-dispatch))
+
      print-result
        (perform (op print-stack-statistics))
        (perform (op announce-output)
@@ -121,6 +137,8 @@
        (goto (label read-eval-print-loop))
 
      eval-dispatch
+       (test (op compile-and-run?) (reg exp))
+       (branch (label ev-compile-and-run))
        (test (op self-evaluating?) (reg exp))
        (branch (label ev-self-eval))
        (test (op variable?) (reg exp))
@@ -156,7 +174,14 @@
        (assign env (op get-global-environment))
        (assign continue (label print-result))
        (goto (reg val))
-       
+
+     ev-compile-and-run
+       (perform (op displayln) (reg exp))
+       (assign exp (op compile-and-run-expression) (reg exp))
+       (assign val (op compile) (reg exp))
+       (perform (op displayln) (reg exp))
+       (goto (reg val))
+            
      ev-self-eval
        (assign val (reg exp))
        (goto (reg continue))
