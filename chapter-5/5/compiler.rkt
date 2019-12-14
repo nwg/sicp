@@ -394,9 +394,11 @@
          (make-label 'primitive-branch))
         (compiled-branch 
          (make-label 'compiled-branch))
+        (compound-branch
+         (make-label 'compound-branch))
         (after-call
          (make-label 'after-call)))
-    (let ((compiled-linkage
+    (let ((branch-linkage
            (if (eq? linkage 'next)
                after-call
                linkage)))
@@ -408,13 +410,15 @@
            (op primitive-procedure?)
            (reg proc))
           (branch 
-           (label ,primitive-branch))))
+           (label ,primitive-branch))
+          (test (op compound-procedure?) (reg proc))
+          (branch (label ,compound-branch))))
        (parallel-instruction-sequences
         (append-instruction-sequences
          compiled-branch
          (compile-proc-appl 
           target
-          compiled-linkage))
+          branch-linkage))
         (append-instruction-sequences
          primitive-branch
          (end-with-linkage
@@ -426,8 +430,47 @@
               ,target
               (op apply-primitive-procedure)
               (reg proc)
-              (reg argl)))))))
+              (reg argl))))))
+        (append-instruction-sequences
+         compound-branch
+         (compile-interp-proc-appl target branch-linkage)))
        after-call))))
+
+(define (compile-interp-proc-appl target linkage)
+  (cond ((and (eq? target 'val)
+              (not (eq? linkage 'return)))
+         (make-instruction-sequence 
+          '(proc)
+          all-regs
+          `((assign continue (label ,linkage))
+            (save continue)
+            (goto (reg compapp)))))
+        ((and (not (eq? target 'val))
+              (not (eq? linkage 'return)))
+         (let ((proc-return 
+                (make-label 'proc-return)))
+           (make-instruction-sequence 
+            '(proc)
+            all-regs
+            `((assign continue 
+                      (label ,proc-return))
+              (save continue)
+              (goto (reg compapp))
+              ,proc-return
+              (assign ,target (reg val))
+              (goto (label ,linkage))))))
+        ((and (eq? target 'val)
+              (eq? linkage 'return))
+         (make-instruction-sequence 
+          '(proc continue) 
+          all-regs
+          '((save continue)
+            (goto (reg compapp)))))
+        ((and (not (eq? target 'val))
+              (eq? linkage 'return))
+         (error "return linkage, 
+                 target not val: COMPILE"
+                target))))
 
 (define (compile-proc-appl target linkage)
   (cond ((and (eq? target 'val)
@@ -558,7 +601,11 @@
    (append (statements seq)
            (statements body-seq))))
 
-(define (parallel-instruction-sequences 
+
+(define (parallel-instruction-sequences . seqs)
+  (foldr parallel-instruction-sequences2 (empty-instruction-sequence) seqs))
+
+(define (parallel-instruction-sequences2
          seq1 seq2)
   (make-instruction-sequence
    (list-union (registers-needed seq1)

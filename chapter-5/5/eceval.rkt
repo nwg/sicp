@@ -9,7 +9,9 @@
   (eceval 'print-stack-statistics))
 
 (define eceval-operations
-  (list (list 'cons cons)
+  (list (list 'displayln displayln)
+        (list 'display display)
+        (list 'cons cons)
         (list '= =)
         (list '* *)
         (list '+ +)
@@ -85,7 +87,8 @@
 (define eceval
   (make-machine
    eceval-operations
-   '(  (branch (label external-entry)) 
+   '(  (assign compapp (label compound-apply))
+       (branch (label external-entry)) 
      
      read-eval-print-loop
        (perform (op initialize-stack))
