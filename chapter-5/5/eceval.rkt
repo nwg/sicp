@@ -9,7 +9,8 @@
   (eceval 'print-stack-statistics))
 
 (define eceval-operations
-  (list (list '= =)
+  (list (list 'cons cons)
+        (list '= =)
         (list '* *)
         (list '+ +)
         (list '- -)
