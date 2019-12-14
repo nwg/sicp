@@ -3,7 +3,9 @@
 (require "eceval.rkt")
 (require "machine.rkt")
 (require "compiler.rkt")
-(require (only-in "interpreter.rkt" setup-environment))
+;(require "metacircular.rkt")
+(require (only-in "eceval.rkt" setup-environment))
+(require "metacircular.rkt")
 
 (define the-global-environment
   (setup-environment))
@@ -23,13 +25,10 @@
      eceval 'flag true)
     (start eceval)))
 
-;;(extract-pkg-dependencies (get-info (list "run.rkt")))
+;; (compile-and-go
+;;  metacircular)
 
-(compile-and-go
- '(define (f x)
-    (g x)))
-
-(compile
- '(define (f x)
-    (g x))
- 'val 'return the-empty-compile-environment)
+;; (compile
+;;  '(define (f x)
+;;     (g x))
+;;  'val 'return the-empty-compile-environment)
