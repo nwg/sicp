@@ -2,51 +2,57 @@
 
 (require "../../utility.rkt")
 
-(provide make-machine)
+(provide make-new-machine)
+(provide install-operations)
+(provide install-instructions)
 (provide set-register-contents!)
 (provide get-register-contents)
 (provide start)
 (provide assemble)
-(require (only-in "eceval-objects.rkt" compiled-procedure?))
+(require "eceval-objects.rkt")
 
-(define (make-machine ops 
-                      controller-text)
-  (let ((machine (make-new-machine)))
-    ((machine 'install-operations) ops)
-    (let-values ([(seq labels) (assemble controller-text machine)])
-      ((machine 'install-instruction-sequence) seq labels))       
-    machine))
+(define (install-operations machine ops)
+  ((machine 'install-operations) ops))
 
-(define (make-register name)
+(define (install-instructions machine insts)
+    (let-values ([(seq labels) (assemble insts machine)])
+      ((machine 'install-instruction-sequence) seq labels)))
+
+(define (insts-string seq)
+  (cond [(null? seq) "<no instructions>"]
+        [(not (null? (instruction-labels (car seq))))
+         (string-join (map ~s (instruction-labels (car seq))) "/")]
+        [else (string-append
+               (car (instruction-text (car seq)))
+               "...")]))
+
+(define (user-string val)
+  (cond [(pair? val)
+         (cond [(instruction? (car val)) (insts-string val)]
+               [(compiled-procedure? val)
+                (string-append
+                  "<compiled-procedure: "
+                  (insts-string (compiled-procedure-entry val))
+                  ">")]
+               [(environment? val) (display-string-for-environment val)]
+               [else (~s val)])]
+        [else (~s val)]))
+
+(define (make-register name trace-file)
   (let ((contents *UNASSIGNED-VALUE*)
         (trace-enabled false))
     (define (dispatch message)
       (cond ((eq? message 'get) contents)
             ((eq? message 'set)
              (lambda (value)
-               (define (print-reg-val val)
-                 (if (pair? val)
-                     (if (mpair? (car val))
-                         (if (not (null? (instruction-labels (car val))))
-                             (display (string-join (map ~s (instruction-labels (car val))) "/"))
-                             ;(display "thing")
-                             (begin
-                               (display (instruction-text (car val)))
-                               (display "...")))
-                         (if (tagged-list? val 'compiled-procedure)
-                             (display "compiled-procedure")
-                             (display val)))
-                     (if (mpair? val)
-                         (displayln "mpair")
-                         (display val))))
                (when trace-enabled
-                 (display "reg ")
-                 (display name)
-                 (display " -- ")
-                 (print-reg-val contents)
-                 (display " -> ")
-                 (print-reg-val value)
-                 (newline))
+                 (display "reg " trace-file)
+                 (display name trace-file)
+                 (display " -- " trace-file)
+                 (display (user-string contents) trace-file)
+                 (display " -> " trace-file)
+                 (display (user-string value) trace-file)
+                 (newline trace-file))
                (set! contents value)))
             ((eq? message 'trace-on)
              (set! trace-enabled true))
@@ -116,9 +122,9 @@
 (define (push stack value)
   ((stack 'push) value))
 
-(define (make-new-machine)
-  (let ((pc (make-register 'pc))
-        (flag (make-register 'flag))
+(define (make-new-machine [trace-file (current-output-port)])
+  (let ((pc (make-register 'pc trace-file))
+        (flag (make-register 'flag trace-file))
         (stack (make-stack))
         (the-instruction-sequence '())
         (execution-count 0)
@@ -167,7 +173,7 @@
             (error 
              "Multiply defined register: " 
              name)
-            (let ([register (make-register name)])
+            (let ([register (make-register name trace-file)])
               (set! register-table
                     (cons 
                      (list name register)
@@ -203,12 +209,13 @@
                 (when trace-enabled
                   (for-each
                    (lambda (label)
-                     (display label)
-                     (display ":")
-                     (newline))
+                     (display label trace-file)
+                     (display ":" trace-file)
+                     (newline trace-file))
                    (instruction-labels (car insts)))
-                  (display (instruction-text (car insts)))
-                  (newline))
+                  (displayln (instruction-text (car insts)) trace-file)
+                  (flush-output trace-file)
+                  )
                 (let ([bp (instruction-breakpoint (car insts))])
                   (if bp
                       (begin
@@ -418,22 +425,23 @@
 (define breakpoint-offset cdr)
 
 (define (make-instruction text)
-  (mcons text (mcons '() (mcons '() false))))
-(define (instruction-text inst) (mcar inst))
+  (cons 'instruction (mcons text (mcons '() (mcons '() false)))))
+(define (instruction? x) (tagged-list? x 'instruction))
+(define (instruction-text inst) (mcar (data inst)))
 (define (instruction-execution-proc inst)
-  (mcadr inst))
+  (mcadr (data inst)))
 (define (instruction-labels inst)
-  (mcaddr inst))
+  (mcaddr (data inst)))
 (define (set-instruction-execution-proc!
          inst
          proc)
-  (set-mcar! (mcdr inst) proc))
+  (set-mcar! (mcdr (data inst)) proc))
 (define (set-instruction-labels! inst labels)
-  (set-mcar! (mcddr inst) labels))
+  (set-mcar! (mcddr (data inst)) labels))
 (define (set-instruction-breakpoint! inst b)
-  (set-mcdr! (mcddr inst) b))
+  (set-mcdr! (mcddr (data inst)) b))
 (define (instruction-breakpoint inst)
-  (mcdddr inst))
+  (mcdddr (data inst)))
 (define (make-label-entry label-name insts)
   (cons label-name insts))
 
@@ -624,11 +632,6 @@
         (else (error "Unknown expression type: 
                       ASSEMBLE"
                      exp))))
-
-(define (tagged-list? exp tag)
-  (if (pair? exp)
-      (eq? (car exp) tag)
-      false))
 
 (define (register-exp? exp)
   (tagged-list? exp 'reg))

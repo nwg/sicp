@@ -52,6 +52,8 @@
   (cond ((self-evaluating? exp)
          (compile-self-evaluating 
           exp target linkage))
+        ((apply? exp)
+         (compile-apply exp target linkage env))
         ((quoted? exp) 
          (compile-quoted exp target linkage))
         ((variable? exp)
@@ -65,10 +67,17 @@
           exp target linkage env))
         ((if? exp)
          (compile-if exp target linkage env))
+        ((and? exp)
+         (compile (and->if exp) target linkage env))
+        ((or? exp)
+         (compile (or->if exp) target linkage env))
         ((lambda? exp)
          (compile-lambda exp target linkage env))
         ((let? exp)
          (compile (let->combination exp) target linkage env))
+        ((let*? exp)
+;         (displayln (let*->nested-lets exp))
+         (compile (let*->nested-lets exp) target linkage env))
         ((begin? exp)
          (compile-sequence 
           (begin-actions exp) target linkage env))
@@ -118,6 +127,55 @@
             '()
             (list target)
             `((assign ,target (const ,exp))))))
+
+(define (compile-apply exp target linkage env)
+  (let* ([proc-compiled (compile (apply-proc exp) 'proc 'next env)]
+         [args-compiled (compile (apply-args exp) 'val 'next env)]
+         [apply-return (make-label 'apply-return)]
+         [final-linkage (if (eq? linkage 'next) apply-return linkage)])
+    (preserving
+     '(env continue)
+     proc-compiled
+     (preserving
+      '(proc continue)
+      args-compiled
+      (cond ((and (eq? target 'val)
+                  (not (eq? final-linkage 'return)))
+          (make-instruction-sequence
+           '(proc val)
+           all-regs
+           `((assign argl (reg val))
+             (assign continue (label ,final-linkage))
+             (save continue)
+             (goto (reg app))
+             ,apply-return)))
+        ((and (not (eq? target 'val))
+              (not (eq? final-linkage 'return)))
+         (make-instruction-sequence
+          '(proc val)
+          all-regs
+          `((assign argl (reg val))
+            (assign continue (label ,final-linkage))
+            (save continue)
+            (goto (reg app))
+            ,apply-return
+            (assign ,target (reg val))
+            (goto (label ,linkage)))))
+        ((and (eq? target 'val)
+              (eq? final-linkage 'return))
+          (make-instruction-sequence
+           '(proc val continue)
+           all-regs
+           `((assign argl (reg val))
+             (save continue)
+             (goto (reg app)))))
+        ((and (not (eq? target 'val))
+              (eq? final-linkage 'return))
+         (display "target is ")
+         (displayln target)
+         (error "return linkage, 
+                 target not val: COMPILE"
+                target)))))))
 
 (define (compile-quoted exp target linkage)
   (end-with-linkage
@@ -278,9 +336,17 @@
         (compile-lambda-body exp proc-entry environment))
        after-lambda))))
 
+(require racket/pretty)
+
 (define (compile-lambda-body exp proc-entry environment)
   (let* ((formals (lambda-parameters exp))
          (extended-compile-env (extend-compile-environment formals environment)))
+;    (displayln (scan-out-defines (lambda-body exp)))
+
+    ;; (let ([scanned (scan-out-defines (lambda-body exp))])
+    ;;   (when (not (equal? scanned (lambda-body exp)))
+    ;;     (pretty-print scanned)))
+    
     (append-instruction-sequences
      (make-instruction-sequence 
       '(env proc argl)
@@ -420,6 +486,9 @@
           target
           branch-linkage))
         (append-instruction-sequences
+         compound-branch
+         (compile-interp-proc-appl target branch-linkage)))
+        (append-instruction-sequences
          primitive-branch
          (end-with-linkage
           linkage
@@ -431,9 +500,6 @@
               (op apply-primitive-procedure)
               (reg proc)
               (reg argl))))))
-        (append-instruction-sequences
-         compound-branch
-         (compile-interp-proc-appl target branch-linkage)))
        after-call))))
 
 (define (compile-interp-proc-appl target linkage)
@@ -615,16 +681,13 @@
    (append (statements seq1)
            (statements seq2))))
 
-;; (compile
-;;  '(define (f + * a b x y)
-;;     (+ (* a x) (* b y)))
-;;  'val
-;;  'next
-;;  the-empty-compile-environment)
 
-;; (compile
-;;  '(define (f a b x y)
-;;     (+ (* a x) (* b y)))
-;;  'val
-;;  'next
-;;  the-empty-compile-environment)
+(define defvar-text
+ '(define (define-variable! var val env)
+    (displayln "in define-variable!")
+    (let* ([frame (first-frame env)]
+           [existing-pair (scan-frame var frame)])
+      (if (not existing-pair)
+          (add-binding-to-frame! var val frame)
+          (set-pair-value! existing-pair val)))))
+

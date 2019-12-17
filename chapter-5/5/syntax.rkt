@@ -140,6 +140,28 @@
          [body (let-actions exp)])
     (cons (make-lambda vars body) initials)))
 
+(define (let*? exp)
+  (tagged-list? exp 'let*))
+(define (let*-definitions exp)
+  (cadr exp))
+(define (let*-actions exp)
+  (cddr exp))
+
+(define (let*->nested-lets exp)
+  (define (helper definitions)
+    (let ([var (caar definitions)]
+          [val (cadar definitions)])
+      (if (null? (cdr definitions))
+          (let* ([body (let*-actions exp)]
+                 [lamb (make-lambda (list var) body)])
+            (list lamb val))
+          (let ([lamb (make-lambda (list var) (list (helper (cdr definitions))))])
+            (list lamb val)))))
+  (let ([definitions (let*-definitions exp)])
+    (if (null? definitions)
+        (make-let '() (let*-actions exp))
+        (helper definitions))))
+
 (define (scan-out-defines body)
   (let-values ([(defines rest) (splitf-at body definition?)])
     (if (null? defines)
@@ -157,6 +179,13 @@
                 (append
                  sets
                  rest))))))))
+
+(define (apply? exp)
+  (tagged-list? exp 'apply))
+(define (apply-proc exp)
+  (cadr exp))
+(define (apply-args exp)
+  (caddr exp))
 
 (define (and? exp)
   (tagged-list? exp 'and))
